@@ -1,0 +1,39 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Xcode — user-specific state
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+
+# Xcode — build products
+build/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+# Package.resolved is intentionally NOT ignored: this is an application, so the
+# resolved dependency graph belongs in version control. Only the machine-specific
+# configuration/ subdirectory is excluded. Ignoring the whole swiftpm/ directory
+# would silently swallow Package.resolved, because git cannot re-include a file
+# whose parent directory is excluded — a `!` negation would not rescue it.
+.build/
+.swiftpm/
+MacMonitor.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/
+
+# Local agent tooling — machine-specific, never published
+.claude/
+
+# Editors
+*.swp
+*~
