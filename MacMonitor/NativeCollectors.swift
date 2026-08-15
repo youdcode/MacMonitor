@@ -344,40 +344,49 @@ struct NetworkCounters: Equatable {
 
 enum NativeNetwork {
 
-    /// Cumulative interface counters, summed over physical interfaces.
+    /// Cumulative interface counters, summed over every interface except loopback.
     ///
-    /// NET_RT_IFLIST2 rather than getifaddrs: if_msghdr2 carries 64-bit counters,
-    /// where if_data wraps at 4 GB.
+    /// Read from `net.link.generic.ifdata.<index>.general`, the interface MIB, and not
+    /// from the routing table's NET_RT_IFLIST2. Both hand back a `if_data64` whose
+    /// `ifi_ibytes` and `ifi_obytes` are declared 64-bit, but on macOS 26.5 the routing
+    /// table's copy carries the value truncated to 32 bits. Measured on en0 at one
+    /// instant, with `netstat -ib` as the reference:
+    ///
+    ///     NET_RT_IFLIST2   ifi_ibytes =  3,428,335,616
+    ///     interface MIB    ifi_ibytes = 12,019,689,658
+    ///     netstat -ib          Ibytes = 12,019,689,658
+    ///
+    /// 12,019,689,658 modulo 2^32 is 3,428,308,564. The packet counters in the same
+    /// routing-table record are correct, so nothing about the record looks wrong: the
+    /// totals were simply a quarter of the truth once the machine had moved 4 GB.
+    /// `netstat` reads the interface MIB, which is how the difference was found.
     static func counters() -> NetworkCounters? {
-        var mib: [Int32] = [CTL_NET, PF_ROUTE, 0, 0, NET_RT_IFLIST2, 0]
-        var size = 0
-        guard sysctl(&mib, 6, nil, &size, nil, 0) == 0, size > 0 else { return nil }
-
-        var buffer = [UInt8](repeating: 0, count: size)
-        guard sysctl(&mib, 6, &buffer, &size, nil, 0) == 0 else { return nil }
+        var interfaceCount: Int32 = 0
+        var countSize = MemoryLayout<Int32>.size
+        var countMIB: [Int32] = [CTL_NET, PF_LINK, NETLINK_GENERIC, IFMIB_SYSTEM, IFMIB_IFCOUNT]
+        guard sysctl(&countMIB, 5, &interfaceCount, &countSize, nil, 0) == 0, interfaceCount > 0 else {
+            collectorLog.error("sysctl IFMIB_IFCOUNT failed")
+            return nil
+        }
 
         var totalIn: UInt64 = 0
         var totalOut: UInt64 = 0
+        var read = 0
 
-        buffer.withUnsafeBytes { raw in
-            var offset = 0
-            while offset + MemoryLayout<if_msghdr>.size <= size {
-                let header = raw.loadUnaligned(fromByteOffset: offset, as: if_msghdr.self)
-                let length = Int(header.ifm_msglen)
-                guard length > 0 else { break }
-
-                if header.ifm_type == RTM_IFINFO2 {
-                    let info = raw.loadUnaligned(fromByteOffset: offset, as: if_msghdr2.self)
-                    // Skip loopback: it doubles every local byte and is not traffic.
-                    if info.ifm_data.ifi_type != UInt8(IFT_LOOP) {
-                        totalIn += info.ifm_data.ifi_ibytes
-                        totalOut += info.ifm_data.ifi_obytes
-                    }
-                }
-                offset += length
-            }
+        // Interface indices are 1-based and contiguous in this MIB.
+        for index in 1...interfaceCount {
+            var data = ifmibdata()
+            var size = MemoryLayout<ifmibdata>.size
+            var mib: [Int32] = [CTL_NET, PF_LINK, NETLINK_GENERIC, IFMIB_IFDATA, index, IFDATA_GENERAL]
+            guard sysctl(&mib, 6, &data, &size, nil, 0) == 0 else { continue }
+            read += 1
+            // Skip loopback: it doubles every local byte and is not traffic.
+            guard data.ifmd_data.ifi_type != UInt8(IFT_LOOP) else { continue }
+            totalIn += data.ifmd_data.ifi_ibytes
+            totalOut += data.ifmd_data.ifi_obytes
         }
 
+        guard read > 0 else { return nil }
         return NetworkCounters(bytesIn: totalIn, bytesWritten: totalOut)
     }
 }

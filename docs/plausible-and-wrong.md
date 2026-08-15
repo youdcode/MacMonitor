@@ -1,4 +1,4 @@
-# Seven ways a monitor lies without erroring
+# Eight ways a monitor lies without erroring
 
 Everything below was measured on one machine: a `Mac16,8` running macOS 26.5
 (build 25F71). Commands are quoted with their real output.
@@ -181,18 +181,68 @@ The fix was editorial, not technical: label the reading as *current throughput* 
 it is read, put capacity in its own card behind a button that says what it will
 consume, and never compute one from the other.
 
+## 8. The one found after this document was finished
+
+The seven above were the audit. This one turned up afterwards, while taking the
+screenshots for the README — which is the only reason it is here rather than shipped.
+
+The Network screen's *Since boot* card read 3.4 GB received. `netstat -ib`, at the same
+instant, read 12.0 GB.
+
+The counters come from the routing table, `NET_RT_IFLIST2`, whose `if_msghdr2` record
+carries a `if_data64`. The comment above the call said so, in as many words: 64-bit
+counters, chosen over `getifaddrs` precisely because `if_data` wraps at 4 GB. The
+packet counters in that record are correct — `ifi_ipackets` 11,122,124 against
+`netstat`'s 11,122,071 — so nothing about the record looks wrong.
+
+The byte counters in it are truncated to 32 bits:
+
+```
+NET_RT_IFLIST2   ifi_ibytes =  3,428,335,616
+interface MIB    ifi_ibytes = 12,019,689,658
+netstat -ib          Ibytes = 12,019,689,658
+```
+
+12,019,689,658 modulo 2^32 is 3,428,308,564. The two readings track each other byte for
+byte from then on, which is why the *throughput* number — a delta between samples — was
+right all along, and only the running total was wrong.
+
+`netstat` gets it right because it does not read the routing table. Its own strings say
+where it looks:
+
+```
+$ strings /usr/sbin/netstat | grep IFDATA
+sysctl IFDATA_SUPPLEMENTAL
+sysctl IFDATA_GENERAL %d
+```
+
+That is the interface MIB, `net.link.generic.ifdata.<index>.general`, which hands back
+a `ifmibdata` whose `if_data64` is genuinely 64-bit. Reading that instead fixed the
+figure, and turned out to cost 0.011 ms per sample against 0.029 ms for the routing
+table, because there is no 10 KB buffer to allocate and walk.
+
+Two things are worth taking from this one. The wrap only shows up after the machine has
+moved 4 GB, so on a freshly booted Mac the wrong code and the right code agree
+perfectly. And the comment asserting the counters were 64-bit was written by someone
+who had read the header, not measured the value — which is the same mistake as trusting
+a test that was written by reading the implementation.
+
 ---
 
 ## The through-line
 
-Seven defects. Zero exceptions, zero warnings, zero failing tests at the moment each
-one was live. Six returned a plausible number; the seventh returned a correct one.
+Eight defects. Zero exceptions, zero warnings, zero failing tests at the moment each
+one was live. Seven returned a plausible number; one returned a correct one.
 
 A green test suite proves the code does what the test says. A clean build proves the
 compiler had no objection. Neither proves the number on screen is true. The only thing
 that did was an independent reference — and in the seventh case, not even that: it
 took noticing that two correct numbers were being compared as if they measured the
 same thing.
+
+The eighth is the one that should worry you most, because by then the audit was over,
+the tests were written, the README was committed, and the defect was found by glancing
+at a screenshot. There is no reason to think it is the last.
 
 ## Where this account is unreliable about itself
 

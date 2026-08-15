@@ -26,7 +26,7 @@ Processes and Cleaner. Every figure comes from the API named beside it.
 | Memory | swap used and total | `sysctlbyname("vm.swapusage")` into `xsw_usage` |
 | Storage | used / free / total | `FileManager.attributesOfFileSystem` |
 | Storage | read and write activity | `IOBlockStorageDriver` → `Statistics`, as a delta |
-| Network | current throughput, totals since boot | `sysctl` `NET_RT_IFLIST2`, all interfaces except loopback |
+| Network | current throughput, totals since boot | `net.link.generic.ifdata.<index>.general`, all interfaces except loopback |
 | Network | measured capacity | ndt7 against M-Lab, on demand only |
 | Battery | charge, time remaining | `IOPSCopyPowerSourcesList` |
 | Battery | cycles, temperature, power, full-charge capacity | `AppleSmartBattery` in the IORegistry |
@@ -129,8 +129,12 @@ Nothing failed. No exception, no `nil`, no warning; just a plausible number of
 gigabytes that fitted comfortably inside the machine. The page size is now read at
 runtime and the conversion is covered by tests.
 
-Six other defects of the same shape, each with the command that caught it, are in
-[docs/plausible-and-wrong.md](docs/plausible-and-wrong.md).
+Seven other defects of the same shape, each with the command that caught it, are in
+[docs/plausible-and-wrong.md](docs/plausible-and-wrong.md). The last of them was found
+after that document was finished and this README was committed, by looking at a
+screenshot: the *Since boot* network total read 3.4 GB where `netstat -ib` read 12.0 GB,
+because the routing table hands back `ifi_ibytes` truncated to 32 bits even though the
+field is declared 64-bit.
 
 ## Architecture
 
