@@ -392,6 +392,8 @@ struct BatteryDetail: Equatable {
     var designCapacity: Int?
     var rawMaxCapacity: Int?
     var cycleCount: Int?
+    /// "Normal" or a fault description, from PermanentFailureStatus.
+    var condition: String?
 
     /// Raw full-charge capacity over design capacity.
     ///
@@ -428,6 +430,9 @@ enum NativeBattery {
         detail.designCapacity = int("DesignCapacity")
         detail.rawMaxCapacity = int("AppleRawMaxCapacity")
         detail.cycleCount = int("CycleCount")
+        if let failure = int("PermanentFailureStatus") {
+            detail.condition = failure == 0 ? "Normal" : "Service Recommended"
+        }
 
         return detail
     }

@@ -60,9 +60,6 @@ struct ThermalInfo {
     /// This is NOT a temperature: macOS exposes no CPU or GPU temperature to
     /// third-party apps on Apple Silicon.
     var thermalLevelValue: Double
-    var gpuTemp: Double
-    var batteryTemp: Double
-    var nandTemp: Double
     var thermalLevel: String       // Nominal / Fair / Serious / Critical
     var thermalDescription: String // Explanatory text
     var history: [Double] = []
@@ -84,16 +81,15 @@ struct Alert: Identifiable {
 
     enum AlertLevel {
         case warning, critical
-        var color: String { self == .warning ? "orange" : "red" }
     }
 }
 
 struct AppProcess: Identifiable {
+    /// The pid IS the identity; a separate `pid` field held the same value twice.
     let id: Int32
     var name: String
     var cpuPercent: Double
     var memoryMB: Double
-    var pid: Int32
 }
 
 struct CacheItem: Identifiable {
@@ -121,7 +117,7 @@ class SystemMonitor: ObservableObject {
     @Published var ram     = RAMUsage(totalGB: 0, usedGB: 0, freeGB: 0, activeGB: 0, inactiveGB: 0, wiredGB: 0, compressedGB: 0, swapUsedGB: 0, swapTotalGB: 0, history: Array(repeating: 0, count: 60), longHistory: Array(repeating: 0, count: 1800))
     @Published var disk    = DiskUsage(totalGB: 0, usedGB: 0, freeGB: 0)
     @Published var battery = BatteryInfo(isPresent: false, percentage: 0, isCharging: false, isPlugged: false, cycleCount: 0, health: "Normal", timeRemaining: "--", temperature: 0)
-    @Published var thermal = ThermalInfo(thermalLevelValue: 0, gpuTemp: 0, batteryTemp: 0, nandTemp: 0, thermalLevel: "Nominal", thermalDescription: "Loading...", history: Array(repeating: 0, count: 60))
+    @Published var thermal = ThermalInfo(thermalLevelValue: 0, thermalLevel: "Nominal", thermalDescription: "Loading...", history: Array(repeating: 0, count: 60))
     @Published var processes: [AppProcess] = []
     @Published var caches: [CacheItem] = []
     @Published var alerts: [Alert] = []
@@ -136,8 +132,25 @@ class SystemMonitor: ObservableObject {
     @Published var clusterLoad = NativeCPU.ClusterLoad(performance: nil, efficiency: nil)
     @Published var diskIORate: (readBytesPerSecond: Double, writeBytesPerSecond: Double)?
     @Published var networkRate: (inBytesPerSecond: Double, outBytesPerSecond: Double)?
-    @Published var powermetricsEnabled = false
 
+    /// Holds the timers somewhere a nonisolated deinit can reach them.
+    final class TimerBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var timers: [Timer] = []
+
+        func keep(_ timer: Timer) {
+            lock.lock(); defer { lock.unlock() }
+            timers.append(timer)
+        }
+
+        func invalidateAll() {
+            lock.lock(); defer { lock.unlock() }
+            timers.forEach { $0.invalidate() }
+            timers.removeAll()
+        }
+    }
+
+    private let timerBox = TimerBox()
     private var timer: Timer?
     private var thermalTimer: Timer?  // less frequent: heavier to collect
     private var batteryStaticFetched = false
@@ -151,25 +164,35 @@ class SystemMonitor: ObservableObject {
     }
 
     func startMonitoring() {
+        guard timer == nil else { return }   // idempotent: onAppear can fire more than once
         Task { await self.refreshAll() }
-        timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        let refreshTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { [weak self] in await self?.refreshAll() }
         }
+        timer = refreshTimer
+        timerBox.keep(refreshTimer)
         // Thermal state every 5 seconds (heavier)
-        thermalTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        let thermal = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task { [weak self] in await self?.fetchThermal() }
         }
+        thermalTimer = thermal
+        timerBox.keep(thermal)
     }
 
     func stopMonitoring() {
-        timer?.invalidate()
-        thermalTimer?.invalidate()
+        timerBox.invalidateAll()
         timer = nil
         thermalTimer = nil
     }
 
-    func refresh() {
-        Task { await self.refreshAll() }
+    /// Timers are retained by the run loop, so an instance that is dropped without
+    /// stopMonitoring() leaves them scheduled forever. They fire as no-ops thanks to
+    /// the weak capture, but they stay on the run loop.
+    ///
+    /// deinit is nonisolated on a @MainActor class and cannot touch the isolated
+    /// stored properties, so the timers are handed to a box the deinit can reach.
+    deinit {
+        timerBox.invalidateAll()
     }
 
     private func refreshAll() async {
@@ -298,7 +321,14 @@ class SystemMonitor: ObservableObject {
         let snapshot = IOPSCopyPowerSourcesInfo().takeRetainedValue()
         let sources  = IOPSCopyPowerSourcesList(snapshot).takeRetainedValue() as Array
 
-        guard let source = sources.first,
+        // Filter on the internal battery: `first` could be a UPS or a Bluetooth
+        // device that also publishes a power source.
+        let internalBattery = sources.first { candidate in
+            guard let info = IOPSGetPowerSourceDescription(snapshot, candidate).takeUnretainedValue() as? [String: Any] else { return false }
+            return (info[kIOPSTypeKey] as? String) == kIOPSInternalBatteryType
+        }
+
+        guard let source = internalBattery ?? sources.first,
               let info = IOPSGetPowerSourceDescription(snapshot, source).takeUnretainedValue() as? [String: Any] else {
             battery = BatteryInfo(isPresent: false, percentage: 0, isCharging: false,
                                   isPlugged: false, cycleCount: 0, health: "N/A", timeRemaining: "N/A", temperature: 0)
@@ -319,17 +349,19 @@ class SystemMonitor: ObservableObject {
         var cycles = battery.cycleCount
         var health  = battery.health
         if !batteryStaticFetched {
-            let battResult = await runShell("system_profiler SPPowerDataType 2>/dev/null | grep -E 'Cycle Count|Condition'")
-            if let info = BatteryStaticParser.parse(battResult) {
-                cycles = info.cycleCount
-                health = info.condition
+            // IORegistry rather than grepping system_profiler for English labels.
+            // That grep returned nothing on a localised system, and `?? 0` then
+            // reported a battery with zero cycles in perfect health.
+            if let detail = NativeBattery.detail(), let count = detail.cycleCount {
+                cycles = count
+                health = detail.condition ?? health
             }
             batteryStaticFetched = true
         }
 
         battery = BatteryInfo(isPresent: true, percentage: pct, isCharging: isCharging,
                               isPlugged: isPlugged, cycleCount: cycles, health: health,
-                              timeRemaining: timeStr, temperature: thermal.batteryTemp)
+                              timeRemaining: timeStr, temperature: NativeBattery.detail()?.temperature ?? 0)
     }
 
     // MARK: - Thermal (ProcessInfo.thermalState - the only API available on Apple Silicon)
@@ -338,7 +370,6 @@ class SystemMonitor: ObservableObject {
         let state = ProcessInfo.processInfo.thermalState
 
         let (level, description) = thermalStateInfo(state)
-        powermetricsEnabled = true  // API dispo sans entitlement
 
         var history = thermal.history
         // Encode the level as a numeric value so the sparkline can plot it
@@ -355,9 +386,6 @@ class SystemMonitor: ObservableObject {
 
         thermal = ThermalInfo(
             thermalLevelValue: numericVal,
-            gpuTemp: 0,
-            batteryTemp: 0,
-            nandTemp: 0,
             thermalLevel: level,
             thermalDescription: description,
             history: history
@@ -407,7 +435,7 @@ class SystemMonitor: ObservableObject {
             // transitional: this is RSS, not phys_footprint. Replaced when the process
             // list moves off `ps` to a native API.
             let memMB  = memPct / 100.0 * physicalMemoryGB * 1024
-            procs.append(AppProcess(id: pid, name: name, cpuPercent: cpuVal, memoryMB: memMB, pid: pid))
+            procs.append(AppProcess(id: pid, name: name, cpuPercent: cpuVal, memoryMB: memMB))
         }
         processes = Array(procs.prefix(12))
     }
@@ -754,24 +782,52 @@ class SystemMonitor: ObservableObject {
 
     // MARK: - Shell helper
 
-    func runShell(_ command: String) async -> String {
+    /// Runs a shell command on a cold path.
+    ///
+    /// Three things the original got wrong. It called waitUntilExit() BEFORE reading
+    /// the pipe, which deadlocks as soon as a command writes more than the pipe
+    /// buffer. It redirected stderr to a pipe nobody ever read, which is the same
+    /// deadlock by another route. And it had no timeout, so a hung command pinned a
+    /// thread and a continuation for the lifetime of the process.
+    ///
+    /// Only two callers remain, both cold: the hardware model at launch, and the
+    /// process list. See LegacyShellParsers for why the latter cannot go native.
+    func runShell(_ command: String, timeout: TimeInterval = 10) async -> String {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
                 let task = Process()
-                let pipe = Pipe()
-                task.standardOutput = pipe
-                task.standardError  = Pipe()
-                task.arguments      = ["-c", command]
-                task.executableURL  = URL(fileURLWithPath: "/bin/zsh")
+                let output = Pipe()
+                let errors = Pipe()
+                task.standardOutput = output
+                task.standardError = errors
+                task.arguments = ["-c", command]
+                task.executableURL = URL(fileURLWithPath: "/bin/zsh")
+
                 do {
                     try task.run()
-                    task.waitUntilExit()
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    continuation.resume(returning: String(data: data, encoding: .utf8) ?? "")
                 } catch {
+                    collectorLog.error("shell command failed to start: \(error.localizedDescription, privacy: .public)")
                     continuation.resume(returning: "")
+                    return
                 }
+
+                // Read both pipes to exhaustion BEFORE waiting. Draining stderr matters
+                // even though it is discarded: an undrained pipe blocks the child.
+                let outData = output.fileHandleForReading.readDataToEndOfFile()
+                _ = errors.fileHandleForReading.readDataToEndOfFile()
+
+                let deadline = Date().addingTimeInterval(timeout)
+                while task.isRunning && Date() < deadline {
+                    usleep(20_000)
+                }
+                if task.isRunning {
+                    collectorLog.error("shell command timed out after \(timeout, privacy: .public)s, terminating")
+                    task.terminate()
+                }
+
+                continuation.resume(returning: String(data: outData, encoding: .utf8) ?? "")
             }
         }
     }
+
 }

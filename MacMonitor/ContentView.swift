@@ -43,9 +43,6 @@ struct ContentView: View {
                             .background(Color.red)
                             .clipShape(Capsule())
                     }
-                    if tab == .thermal && !monitor.powermetricsEnabled {
-                        StatusDot(color: .orange)
-                    }
                 }
             }
             .listStyle(.sidebar)
@@ -79,6 +76,10 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        // Monitoring restarts when the window comes back. stopMonitoring used to be
+        // a one-way door: nothing ever called startMonitoring again, so a window
+        // close left the app permanently frozen on its last values.
+        .onAppear { monitor.startMonitoring() }
         .onDisappear { monitor.stopMonitoring() }
 
     }

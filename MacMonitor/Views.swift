@@ -390,7 +390,7 @@ struct ProcessesView: View {
                                     .foregroundColor(.secondary)
                                     .frame(width: 80, alignment: .trailing)
                                 
-                                Text("\(proc.pid)")
+                                Text("\(proc.id)")
                                     .font(.system(size: 11, design: .monospaced))
                                     .foregroundColor(.secondary)
                                     .frame(width: 50, alignment: .trailing)

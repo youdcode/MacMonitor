@@ -3,10 +3,10 @@ import XCTest
 
 /// Tests for the shell-output parsers.
 ///
-/// TRANSITIONAL, like the code they cover: when the collectors move to native APIs
-/// (host_statistics64, xsw_usage, a native process listing) both LegacyShellParsers
-/// and this file are deleted in the same commit. Leaving green tests behind for code
-/// nothing calls would be worse than having no tests at all.
+/// TRANSITIONAL, like the code it covers. The vm_stat, swapusage and system_profiler
+/// tests have already gone, each in the same commit as the parser it covered. Only
+/// ps remains, and only because a non-privileged process cannot read another user's
+/// CPU time on macOS.
 ///
 /// Fixtures are real output captured on the machine, trimmed where noted.
 final class LegacyShellParsersTests: XCTestCase {
@@ -58,35 +58,5 @@ final class LegacyShellParsersTests: XCTestCase {
         XCTAssertNil(PSParser.parseRow("younes 402 34.2"))            // too few columns
         XCTAssertNil(PSParser.parseRow("not a process line at all"))
         XCTAssertEqual(PSParser.parse("").count, 0)
-    }
-
-    // MARK: - system_profiler SPPowerDataType
-
-    func testBatteryStaticParsesCycleCountAndCondition() {
-        let fixture = """
-                  Cycle Count: 513
-                  Condition: Normal
-        """
-        let info = BatteryStaticParser.parse(fixture)
-
-        XCTAssertEqual(info?.cycleCount, 513)
-        XCTAssertEqual(info?.condition, "Normal")
-    }
-
-    /// system_profiler localises its output. When the English keys are absent the
-    /// parser must say so, rather than reporting a battery with zero cycles in
-    /// perfect condition - which is what the original `?? 0` produced.
-    func testBatteryStaticFailsWhenTheEnglishKeysAreAbsent() {
-        let localised = """
-                  Nombre de cycles: 513
-                  Etat: Normal
-        """
-        XCTAssertNil(BatteryStaticParser.parse(localised))
-    }
-
-    func testBatteryStaticFailsOnEmptyOrPartialOutput() {
-        XCTAssertNil(BatteryStaticParser.parse(""))
-        XCTAssertNil(BatteryStaticParser.parse("          Cycle Count: 513"))   // no condition
-        XCTAssertNil(BatteryStaticParser.parse("          Condition: Normal"))  // no cycles
     }
 }

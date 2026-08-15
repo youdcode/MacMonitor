@@ -6,7 +6,7 @@ import Foundation
 // host_statistics64 and xsw_usage. Their tests went with them, in the same commit,
 // rather than staying green over code nothing calls.
 //
-// The two below cannot go yet:
+// What remains cannot go yet:
 //
 // - ps. A non-privileged process cannot read another user's CPU time on macOS.
 //   proc_pid_rusage and proc_pidinfo both return -1 for a process it does not own
@@ -16,10 +16,7 @@ import Foundation
 //   every system process from the list, which is worse than spawning one process
 //   every two seconds.
 //
-// - system_profiler, for the battery cycle count and condition. Replaceable by
-//   IORegistry, which is the next lot.
-//
-// Both return an optional and fail explicitly on unparseable input. The original
+// It returns an optional and fails explicitly on unparseable input. The original
 // code used ?? 0 throughout, so a format change produced a confident zero.
 
 // MARK: - ps
@@ -56,29 +53,5 @@ enum PSParser {
     /// Parses full `ps aux` output, keeping every genuine process row in order.
     static func parse(_ output: String) -> [PSRow] {
         output.components(separatedBy: "\n").compactMap(parseRow)
-    }
-}
-
-// MARK: - system_profiler SPPowerDataType
-
-enum BatteryStaticParser {
-
-    /// Extracts cycle count and condition.
-    ///
-    /// The keys are matched in English. system_profiler localises its output, so on
-    /// a fully localised system this returns nil rather than a confident zero.
-    static func parse(_ output: String) -> (cycleCount: Int, condition: String)? {
-        var cycles: Int?
-        var condition: String?
-
-        for line in output.components(separatedBy: "\n") {
-            guard let value = line.components(separatedBy: ": ").last?.trimmingCharacters(in: .whitespaces),
-                  !value.isEmpty else { continue }
-            if line.contains("Cycle Count") { cycles = Int(value) }
-            if line.contains("Condition") { condition = value }
-        }
-
-        guard let cycles, let condition else { return nil }
-        return (cycles, condition)
     }
 }
