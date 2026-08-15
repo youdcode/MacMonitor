@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // Pure, dependency-free computation used by the collectors.
 //
@@ -124,5 +125,94 @@ enum HealthVerdict: Equatable {
         case 1: return .oneIssue
         default: return .severalIssues
         }
+    }
+}
+
+// MARK: - Link capacity
+
+/// How a measured link capacity is described to the reader.
+///
+/// The boundaries are a design choice, not a measurement: they are round numbers
+/// chosen to match how people talk about connections, and nothing in this project
+/// establishes them empirically. They are here rather than scattered through the view
+/// so there is one place to argue with them.
+///
+/// This describes the result of a capacity test. It never describes the current
+/// throughput, which is a different quantity - see the note on the Network screen.
+enum SpeedTier: Int, CaseIterable, Equatable {
+    case verySlow, slow, normal, fast, veryFast
+
+    static func forMegabitsPerSecond(_ mbps: Double) -> SpeedTier {
+        switch mbps {
+        case ..<5: return .verySlow
+        case ..<25: return .slow
+        case ..<100: return .normal
+        case ..<500: return .fast
+        default: return .veryFast
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .verySlow: return "Very slow"
+        case .slow: return "Slow"
+        case .normal: return "Normal"
+        case .fast: return "Fast"
+        case .veryFast: return "Very fast"
+        }
+    }
+
+    /// SF Symbols rather than emoji: vector, scaling with Dynamic Type, and carrying a
+    /// VoiceOver label. An emoji would undo the accessibility work.
+    ///
+    /// All five exist in SF Symbols 4, which ships with macOS 13, the deployment
+    /// target. The needle-gauge family that would give five members of one family
+    /// arrived in SF Symbols 5 and cannot be used here.
+    var symbol: String {
+        switch self {
+        case .verySlow: return "tortoise.fill"
+        case .slow: return "gauge.low"
+        case .normal: return "gauge.medium"
+        case .fast: return "gauge.high"
+        case .veryFast: return "bolt.fill"
+        }
+    }
+
+    var colour: Color {
+        switch self {
+        case .verySlow: return .red
+        case .slow: return .orange
+        case .normal: return .yellow
+        case .fast: return .green
+        case .veryFast: return .green
+        }
+    }
+}
+
+// MARK: - Transfer time
+
+enum TransferEstimate {
+
+    /// A 4K feature film, taken as 15 GB. A round, stated figure rather than a title:
+    /// the number is the point, and naming a film would date the line and borrow
+    /// someone else's brand.
+    static let fourKFilmBytes: Double = 15_000_000_000
+
+    /// Seconds to move `bytes` at `megabitsPerSecond`.
+    ///
+    /// Returns nil for a non-positive rate rather than dividing by zero and reporting
+    /// an infinite or absurd duration.
+    static func seconds(forBytes bytes: Double, atMegabitsPerSecond mbps: Double) -> Double? {
+        guard mbps > 0, bytes > 0 else { return nil }
+        let bitsPerSecond = mbps * 1_000_000
+        return bytes * 8 / bitsPerSecond
+    }
+
+    /// A short human duration: "2 min 14 s", "1 h 03 min", "43 s".
+    static func humanDuration(seconds: Double) -> String {
+        let total = Int(seconds.rounded())
+        if total < 60 { return "\(total) s" }
+        if total < 3600 { return "\(total / 60) min \(String(format: "%02d", total % 60)) s" }
+        return "\(total / 3600) h \(String(format: "%02d", (total % 3600) / 60)) min"
     }
 }

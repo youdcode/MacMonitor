@@ -17,6 +17,8 @@
 		A010 /* LegacyShellParsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F011 /* LegacyShellParsers.swift */; };
 		A011 /* CacheCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F012 /* CacheCleaner.swift */; };
 		AASS /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FASS /* Assets.xcassets */; };
+		A030 /* SpeedTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = F030 /* SpeedTest.swift */; };
+		T030 /* NetworkMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF30 /* NetworkMetricsTests.swift */; };
 		A012 /* NativeCollectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = F013 /* NativeCollectors.swift */; };
 		TA01 /* MetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF01 /* MetricsTests.swift */; };
 		TA02 /* LegacyShellParsersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF02 /* LegacyShellParsersTests.swift */; };
@@ -53,6 +55,8 @@
 		F011 /* LegacyShellParsers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyShellParsers.swift; sourceTree = "<group>"; };
 		F012 /* CacheCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheCleaner.swift; sourceTree = "<group>"; };
 		FASS /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F030 /* SpeedTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedTest.swift; sourceTree = "<group>"; };
+		TF30 /* NetworkMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMetricsTests.swift; sourceTree = "<group>"; };
 		F013 /* NativeCollectors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCollectors.swift; sourceTree = "<group>"; };
 		PROD /* MacMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MacMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		TF01 /* MetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricsTests.swift; sourceTree = "<group>"; };
@@ -111,6 +115,7 @@
 				F012 /* CacheCleaner.swift */,
 				FASS /* Assets.xcassets */,
 				F013 /* NativeCollectors.swift */,
+				F030 /* SpeedTest.swift */,
 				F020 /* DesignSystem.swift */,
 				F021 /* DetailScreen.swift */,
 				F022 /* ProcessorView.swift */,
@@ -129,7 +134,8 @@
 				TF01 /* MetricsTests.swift */,
 				TF02 /* LegacyShellParsersTests.swift */,
 				TF03 /* CachePathValidatorTests.swift */,
-			);
+				TF30 /* NetworkMetricsTests.swift */,
+					);
 			path = MacMonitorTests;
 			sourceTree = "<group>";
 		};
@@ -259,6 +265,7 @@
 				A010 /* LegacyShellParsers.swift in Sources */,
 				A011 /* CacheCleaner.swift in Sources */,
 				A012 /* NativeCollectors.swift in Sources */,
+				A030 /* SpeedTest.swift in Sources */,
 				A020 /* DesignSystem.swift in Sources */,
 				A021 /* DetailScreen.swift in Sources */,
 				A022 /* ProcessorView.swift in Sources */,
@@ -277,7 +284,8 @@
 				TA01 /* MetricsTests.swift in Sources */,
 				TA02 /* LegacyShellParsersTests.swift in Sources */,
 				TA03 /* CachePathValidatorTests.swift in Sources */,
-			);
+				T030 /* NetworkMetricsTests.swift in Sources */,
+					);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
