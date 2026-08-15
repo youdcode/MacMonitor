@@ -189,6 +189,62 @@ enum SpeedTier: Int, CaseIterable, Equatable {
     }
 }
 
+// MARK: - Gauge scale
+
+/// Where a link speed sits on the capacity dial.
+///
+/// The scale is logarithmic, base ten, over three decades: 1 Mbit/s at the left stop
+/// and 1000 Mbit/s at the right one, each decade taking a third of the sweep.
+///
+/// Linear would be unreadable, and not by a little. On a linear 0-1000 dial with the
+/// same 270 degrees of travel:
+///
+///       5 Mbit/s     1.4 degrees        23 % of the sweep here
+///      20 Mbit/s     5.4 degrees        43 %
+///      50 Mbit/s    13.5 degrees        57 %
+///     100 Mbit/s    27.0 degrees        67 %
+///
+/// Everything from an unusable connection to a good one would sit inside the first
+/// twenty-seven degrees, indistinguishable from each other, while the top half of the
+/// dial would be reserved for speeds most people do not have. Logarithmically, 5, 20
+/// and 50 Mbit/s are 54 and 36 degrees apart, which is the difference between reading
+/// a dial and squinting at it.
+///
+/// Three decades rather than four or five: every decade added costs a third of the
+/// resolution of the ones people actually live on. Below 1 Mbit/s a link is broken
+/// rather than slow, and above 1000 the needle stops - in both cases the exact number
+/// is printed in the middle of the dial, so the reading is never lost, only the
+/// position.
+enum GaugeScale {
+
+    static let minimum: Double = 1
+    static let maximum: Double = 1000
+
+    /// log10(maximum / minimum). Three.
+    static let decades: Double = 3
+
+    /// 0 at the left stop, 1 at the right one. Clamped at both ends.
+    static func fraction(forMegabitsPerSecond mbps: Double) -> Double {
+        guard mbps > 0 else { return 0 }
+        return min(max(log10(mbps / minimum) / decades, 0), 1)
+    }
+
+    /// Labelled: the decade boundaries, which land on the four diagonals of a
+    /// 270-degree sweep and so never collide with the readout in the middle.
+    static let majorTicks: [Double] = [1, 10, 100, 1000]
+
+    /// Unlabelled: the 2 and the 5 of each decade. The 1-2-5 series is what every
+    /// measuring instrument uses, and it is what Google's own dial uses.
+    static let minorTicks: [Double] = [2, 5, 20, 50, 200, 500]
+
+    /// The top label carries a plus, because the needle stops there and links faster
+    /// than a gigabit exist. Writing "1000" alone would claim the stop meant exactly
+    /// that.
+    static func label(forTick tick: Double) -> String {
+        tick >= maximum ? "\(Int(tick))+" : "\(Int(tick))"
+    }
+}
+
 // MARK: - Transfer time
 
 enum TransferEstimate {

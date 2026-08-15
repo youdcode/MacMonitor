@@ -39,6 +39,86 @@ final class NetworkMetricsTests: XCTestCase {
         }
     }
 
+    // MARK: - Gauge scale
+
+    func testTheStopsAreOneAndOneThousand() {
+        XCTAssertEqual(GaugeScale.fraction(forMegabitsPerSecond: 1), 0, accuracy: 1e-12)
+        XCTAssertEqual(GaugeScale.fraction(forMegabitsPerSecond: 1000), 1, accuracy: 1e-12)
+    }
+
+    /// Three decades, one third of the sweep each. This is the whole scale in one test.
+    func testEachDecadeTakesAThirdOfTheSweep() {
+        XCTAssertEqual(GaugeScale.fraction(forMegabitsPerSecond: 10), 1.0 / 3, accuracy: 1e-12)
+        XCTAssertEqual(GaugeScale.fraction(forMegabitsPerSecond: 100), 2.0 / 3, accuracy: 1e-12)
+    }
+
+    /// The middle of a logarithmic dial is the geometric mean of its ends, not the
+    /// arithmetic one. 31.6 Mbit/s sits halfway, 500 Mbit/s does not.
+    func testTheMiddleOfTheDialIsTheGeometricMean() {
+        XCTAssertEqual(GaugeScale.fraction(forMegabitsPerSecond: 31.6227766), 0.5, accuracy: 1e-6)
+        XCTAssertNotEqual(GaugeScale.fraction(forMegabitsPerSecond: 500), 0.5, accuracy: 0.1)
+    }
+
+    /// The defining property: the same ratio always moves the needle the same distance,
+    /// wherever it is on the dial. A doubling is a doubling.
+    func testADoublingMovesTheNeedleByTheSameAmountAnywhere() {
+        let step = log10(2.0) / 3
+        for start in [1.5, 4.0, 12.0, 60.0, 300.0] {
+            let moved = GaugeScale.fraction(forMegabitsPerSecond: start * 2)
+                      - GaugeScale.fraction(forMegabitsPerSecond: start)
+            XCTAssertEqual(moved, step, accuracy: 1e-12)
+        }
+    }
+
+    /// What the choice buys, stated as a number so it can be argued with. On a linear
+    /// 0-1000 dial a 20 Mbit/s connection sits at 2 % of the sweep, five degrees out of
+    /// 270, which is not a reading. Here it sits at 43 %.
+    func testTwentyMegabitsIsReadableHereAndInvisibleOnALinearDial() {
+        let here = GaugeScale.fraction(forMegabitsPerSecond: 20)
+        let linear = 20.0 / GaugeScale.maximum
+        XCTAssertEqual(here, 0.4337, accuracy: 0.0001)
+        XCTAssertEqual(linear, 0.02, accuracy: 0.0001)
+        XCTAssertGreaterThan(here * 270 - linear * 270, 100)   // degrees apart
+    }
+
+    /// A link outside the scale pins the needle rather than running off the dial. The
+    /// exact figure is printed in the middle either way, so nothing is lost but the
+    /// position.
+    func testValuesOutsideTheScalePinRatherThanEscape() {
+        XCTAssertEqual(GaugeScale.fraction(forMegabitsPerSecond: 0.1), 0)
+        XCTAssertEqual(GaugeScale.fraction(forMegabitsPerSecond: 0), 0)
+        XCTAssertEqual(GaugeScale.fraction(forMegabitsPerSecond: -5), 0)
+        XCTAssertEqual(GaugeScale.fraction(forMegabitsPerSecond: 10_000), 1)
+    }
+
+    func testTheScaleNeverGoesBackwards() {
+        var previous = -1.0
+        for mbps in stride(from: 0.5, through: 1200, by: 0.5) {
+            let f = GaugeScale.fraction(forMegabitsPerSecond: mbps)
+            XCTAssertGreaterThanOrEqual(f, previous)
+            previous = f
+        }
+    }
+
+    /// The top of the dial is a stop, not a reading, and the label has to say so.
+    func testOnlyTheTopTickCarriesAPlus() {
+        XCTAssertEqual(GaugeScale.label(forTick: 1), "1")
+        XCTAssertEqual(GaugeScale.label(forTick: 10), "10")
+        XCTAssertEqual(GaugeScale.label(forTick: 100), "100")
+        XCTAssertEqual(GaugeScale.label(forTick: 1000), "1000+")
+    }
+
+    func testEveryTickLandsOnTheDial() {
+        for tick in GaugeScale.majorTicks + GaugeScale.minorTicks {
+            let f = GaugeScale.fraction(forMegabitsPerSecond: tick)
+            XCTAssertGreaterThanOrEqual(f, 0)
+            XCTAssertLessThanOrEqual(f, 1)
+        }
+        // and no minor tick sits on top of a major one
+        let majors = Set(GaugeScale.majorTicks)
+        XCTAssertTrue(GaugeScale.minorTicks.allSatisfy { !majors.contains($0) })
+    }
+
     // MARK: - Transfer time
 
     func testDownloadDurationIsBytesTimesEightOverBitRate() {
