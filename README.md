@@ -220,7 +220,7 @@ field is declared 64-bit.
 
 ## Architecture
 
-Three layers, 4,204 lines of Swift across 19 files, plus 4 test files.
+Three layers, 4,297 lines of Swift across 19 files, plus 4 test files.
 
 **Collection** reads the kernel and the IORegistry. One shell command remains, `ps`,
 because a non-privileged process cannot read another user's CPU time:
@@ -241,7 +241,7 @@ first commit, "the disk is filling up" meant 60 %, 80 %, 85 %, 90 %, "under 20 G
 
 ## Tests
 
-64 tests, on the calculation layer and the remaining parsers.
+67 tests, on the calculation layer and the remaining parsers.
 
 Each one is derived from the observed defect and the expected behaviour rather than
 from reading the fix — a test written by reading the implementation mostly proves the
