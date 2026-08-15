@@ -32,6 +32,24 @@ Network screen shows a real ndt7 run against `mlab2-par05` — 680 Mbit/s down a
 up, 1.2 GB moved — beside a current throughput of 3 kB/s, which is the pair of numbers
 this README spends a section on.
 
+## Getting it
+
+There is no signed build to download, and no date is being promised for one. What
+exists is the source.
+
+```
+git clone https://github.com/youdcode/MacMonitor.git && cd MacMonitor
+xcodebuild -scheme MacMonitor -destination 'platform=macOS' -derivedDataPath .build build
+open .build/Build/Products/Debug/MacMonitor.app
+```
+
+That needs Xcode — 26.6 here, older versions untested — and nothing else to configure.
+Fifteen seconds on the machine this was written on, for an application of 3.2 MB. The
+cost is Xcode itself, which is 3.7 GB on this disk.
+
+Signing is ad-hoc (`CODE_SIGN_IDENTITY = "-"`, no development team), so it builds
+without an Apple Developer account, and the result is not notarised.
+
 ## What it measures
 
 Eight screens: Overview, then Processor, Memory, Storage, Network and Battery, then
@@ -274,21 +292,6 @@ test bundle is declared for macOS 13 like everything else here, because 13 is wh
 test code needs. Declaring 14 would silence the warnings by stating a property of one
 toolchain as a property of this repository.
 
-## Building
-
-Built with Xcode 26.6. Deployment target macOS 13. Clone and build; there is nothing to
-configure.
-
-Signing is ad-hoc (`CODE_SIGN_IDENTITY = "-"`, no development team), so it builds
-without an Apple Developer account, and the result is not notarised.
-
-Two images in this repository are drawn by scripts rather than committed as artwork
-nobody can check the provenance of: the application icon by
-`Tools/GenerateAppIcon.swift`, and the card that shows when the link is shared, by
-`Tools/GenerateSocialPreview.swift`. Their output is committed as well, so a fresh
-clone builds without running either. Both re-render byte-identically, which was
-checked by running them and looking at `git status`.
-
 ## Known gaps
 
 - Everything here was measured on one machine: a `Mac16,8` running macOS 26.5
@@ -319,6 +322,12 @@ Least likely to fit: anything that needs a private framework or an entitlement,
 anything that makes the application measure on its own rather than when it is asked to,
 and any figure nothing outside the app can check. Those are not oversights — [what was
 deliberately left out](#what-was-deliberately-left-out) gives the reason for each.
+
+Two images here are drawn by scripts rather than committed as artwork nobody can check
+the provenance of: the application icon by `Tools/GenerateAppIcon.swift`, and the card
+that shows when the link is shared, by `Tools/GenerateSocialPreview.swift`. Change
+either and re-run its script; both re-render byte-identically, so `git status` after a
+run says whether anything actually moved.
 
 This is one person's side project. It will be read when it is read.
 
