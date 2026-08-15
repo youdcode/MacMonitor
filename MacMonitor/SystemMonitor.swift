@@ -57,8 +57,10 @@ struct BatteryInfo {
 
 struct ThermalInfo {
     /// ProcessInfo.thermalState encoded on a 0-100 scale so the sparkline can plot it.
-    /// This is NOT a temperature: macOS exposes no CPU or GPU temperature to
-    /// third-party apps on Apple Silicon.
+    /// This is NOT a temperature. On the machine tested - a Mac16,8 running
+    /// macOS 26.3 - no CPU or GPU temperature was reachable from a third-party
+    /// process: powermetrics has no `smc` sampler any more, and its `thermal`
+    /// sampler reports pressure notifications rather than degrees.
     var thermalLevelValue: Double
     var thermalLevel: String       // Nominal / Fair / Serious / Critical
     var thermalDescription: String // Explanatory text
@@ -364,7 +366,7 @@ class SystemMonitor: ObservableObject {
                               timeRemaining: timeStr, temperature: NativeBattery.detail()?.temperature ?? 0)
     }
 
-    // MARK: - Thermal (ProcessInfo.thermalState - the only API available on Apple Silicon)
+    // MARK: - Thermal state
 
     func fetchThermal() async {
         let state = ProcessInfo.processInfo.thermalState
@@ -527,8 +529,9 @@ class SystemMonitor: ObservableObject {
         if disk.freeGB < 10 {
             newAlerts.append(Alert(kind: .disk, message: "Storage almost full - \(String(format: "%.1f", disk.freeGB)) GB left", level: .critical, timestamp: Date(), icon: "internaldrive"))
         }
-        // The app has no access to actual temperatures, so alerts report the
-        // thermal state macOS publishes, never a number of degrees.
+        // No CPU or GPU temperature was reachable on the machine tested, so thermal
+        // alerts report the state macOS publishes, never a number of degrees. The
+        // battery temperature is read separately.
         if thermal.thermalLevel == "Critical" {
             newAlerts.append(Alert(kind: .thermal, message: "Thermal state critical - close some apps immediately", level: .critical, timestamp: Date(), icon: "thermometer.high"))
         } else if thermal.thermalLevel == "Serious" {

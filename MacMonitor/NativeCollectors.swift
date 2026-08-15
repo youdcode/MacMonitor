@@ -385,7 +385,15 @@ enum NativeNetwork {
 // MARK: - Battery
 
 struct BatteryDetail: Equatable {
-    /// Degrees Celsius. The only temperature Apple Silicon exposes to a third-party app.
+    /// Degrees Celsius, from AppleSmartBattery.
+    ///
+    /// On the machine this was built against - a Mac16,8 running macOS 26.3 - this
+    /// was the only temperature reachable from a third-party process. powermetrics
+    /// does not expose the others at all any more: its sampler list has no `smc`
+    /// entry, and the `thermal` sampler it does have reports pressure notifications
+    /// rather than degrees. That is not a privilege question - the sampler name is
+    /// rejected before the superuser check, so `powermetrics --samplers smc` answers
+    /// `unrecognized sampler: smc` without sudo.
     var temperature: Double?
     /// Watts. Negative while discharging.
     var power: Double?
