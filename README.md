@@ -157,7 +157,7 @@ field is declared 64-bit.
 
 ## Architecture
 
-Three layers, 3,714 lines of Swift across 19 files.
+Three layers, 3,756 lines of Swift across 19 files, plus 4 test files.
 
 **Collection** reads the kernel and the IORegistry. One shell command remains, `ps`,
 because a non-privileged process cannot read another user's CPU time:
