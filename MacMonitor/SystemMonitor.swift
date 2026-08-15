@@ -173,8 +173,7 @@ class SystemMonitor: ObservableObject {
 
     // MARK: - CPU (host_cpu_load_info delta)
 
-    private var lastCPUTicks: (user: UInt32, sys: UInt32, idle: UInt32, nice: UInt32) = (0, 0, 0, 0)
-    private var hasCPUBaseline = false
+    private var lastCPUTicks: CPUMath.Ticks?
 
     func fetchCPU() async {
         var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info>.stride / MemoryLayout<integer_t>.stride)
@@ -188,32 +187,22 @@ class SystemMonitor: ObservableObject {
 
         guard result == KERN_SUCCESS else { return }
 
-        let curUser = cpuLoad.cpu_ticks.0
-        let curSys  = cpuLoad.cpu_ticks.1
-        let curIdle = cpuLoad.cpu_ticks.2
-        let curNice = cpuLoad.cpu_ticks.3
+        let current = CPUMath.Ticks(user: cpuLoad.cpu_ticks.0,
+                                    system: cpuLoad.cpu_ticks.1,
+                                    idle: cpuLoad.cpu_ticks.2,
+                                    nice: cpuLoad.cpu_ticks.3)
 
-        let dUser = Double(curUser &- lastCPUTicks.user)
-        let dSys  = Double(curSys  &- lastCPUTicks.sys)
-        let dIdle = Double(curIdle &- lastCPUTicks.idle)
-        let dNice = Double(curNice &- lastCPUTicks.nice)
-        let total = dUser + dSys + dIdle + dNice
+        // The first call has no previous sample. CPUMath returns nil for that, and
+        // publishing nothing is the point: a delta against a zero baseline would be
+        // the average since boot dressed up as an instant reading.
+        let previous = lastCPUTicks
+        lastCPUTicks = current
 
-        lastCPUTicks = (curUser, curSys, curIdle, curNice)
+        guard let load = CPUMath.load(current: current, previous: previous) else { return }
 
-        // The first call has no previous sample, so the delta would be the tick
-        // counts since boot: an average since startup, not an instant reading.
-        // Seed the baseline and publish nothing.
-        guard hasCPUBaseline else {
-            hasCPUBaseline = true
-            return
-        }
-
-        guard total > 0 else { return }
-
-        let userVal = (dUser + dNice) / total * 100
-        let sysVal  = dSys  / total * 100
-        let idleVal = dIdle / total * 100
+        let userVal = load.user
+        let sysVal  = load.system
+        let idleVal = load.idle
 
         var history = cpu.history
         history.append(userVal + sysVal)
@@ -235,38 +224,27 @@ class SystemMonitor: ObservableObject {
         let totalGB = Double(totalRAM) / 1_073_741_824
 
         let vmResult = await runShell("vm_stat")
-        var free = 0.0, active = 0.0, inactive = 0.0, wired = 0.0, compressed = 0.0
+        guard let pages = VMStatParser.parse(vmResult) else { return }
 
         // vm_stat reports page counts, not bytes. The page size is 4 KB on Intel
-        // but 16 KB on Apple Silicon, so it must be read at runtime: hardcoding
-        // 4096 under-reports every memory figure by a factor of 4 on Apple Silicon.
-        let gb = Double(vm_page_size) / 1_073_741_824
+        // but 16 KB on Apple Silicon, so it is read at runtime: hardcoding 4096
+        // under-reports every memory figure by a factor of 4 on Apple Silicon.
+        let pageSize = Int(vm_page_size)
+        func gigabytes(_ p: Double) -> Double { MemoryMath.gigabytes(pages: p, pageSize: pageSize) ?? 0 }
 
-        for line in vmResult.components(separatedBy: "\n") {
-            let parts = line.components(separatedBy: ":")
-            guard parts.count >= 2 else { continue }
-            let val = Double(parts[1].trimmingCharacters(in: .init(charactersIn: " ."))) ?? 0
-            let key = parts[0]
-            if key == "Pages free"                        { free       = val * gb }
-            else if key == "Pages active"                { active     = val * gb }
-            else if key == "Pages inactive"              { inactive   = val * gb }
-            else if key == "Pages wired down"            { wired      = val * gb }
-            else if key == "Pages occupied by compressor" { compressed = val * gb }
-        }
+        let free       = gigabytes(pages.free)
+        let active     = gigabytes(pages.active)
+        let inactive   = gigabytes(pages.inactive)
+        let wired      = gigabytes(pages.wired)
+        let compressed = gigabytes(pages.occupiedByCompressor)
 
         // Real used memory = active + wired + compressed (inactive is reclaimable)
         let used = active + wired + compressed
 
         let swapResult = await runShell("sysctl vm.swapusage")
-        var swapUsed = 0.0, swapTotal = 0.0
-        if let r = swapResult.range(of: #"used = (\d+\.?\d*)M"#, options: .regularExpression) {
-            let s = swapResult[r].replacingOccurrences(of: "used = ", with: "").replacingOccurrences(of: "M", with: "")
-            swapUsed = (Double(s) ?? 0) / 1024
-        }
-        if let r = swapResult.range(of: #"total = (\d+\.?\d*)M"#, options: .regularExpression) {
-            let s = swapResult[r].replacingOccurrences(of: "total = ", with: "").replacingOccurrences(of: "M", with: "")
-            swapTotal = (Double(s) ?? 0) / 1024
-        }
+        let swap = SwapUsageParser.parse(swapResult)
+        let swapUsed  = swap?.used  ?? 0
+        let swapTotal = swap?.total ?? 0
 
         var history = ram.history
         history.append(totalGB > 0 ? used / totalGB : 0)
@@ -324,13 +302,9 @@ class SystemMonitor: ObservableObject {
         var health  = battery.health
         if !batteryStaticFetched {
             let battResult = await runShell("system_profiler SPPowerDataType 2>/dev/null | grep -E 'Cycle Count|Condition'")
-            for line in battResult.components(separatedBy: "\n") {
-                if line.contains("Cycle Count"), let val = line.components(separatedBy: ": ").last {
-                    cycles = Int(val.trimmingCharacters(in: .whitespaces)) ?? 0
-                }
-                if line.contains("Condition"), let val = line.components(separatedBy: ": ").last {
-                    health = val.trimmingCharacters(in: .whitespaces)
-                }
+            if let info = BatteryStaticParser.parse(battResult) {
+                cycles = info.cycleCount
+                health = info.condition
             }
             batteryStaticFetched = true
         }
@@ -402,14 +376,12 @@ class SystemMonitor: ObservableObject {
         var procs: [AppProcess] = []
         // No dropFirst here: `sort` mixes the ps header in with the rows, so it is
         // not on the first line. Dropping line 1 removed the top CPU consumer.
-        // The header is discarded by the guard below, which cannot parse it.
-        for line in result.components(separatedBy: "\n") {
-            let parts = line.split(separator: " ", maxSplits: 10, omittingEmptySubsequences: true)
-            guard parts.count >= 11 else { continue }
-            let pid    = Int32(parts[1]) ?? 0
-            let cpuVal = Double(parts[2]) ?? 0
-            let memPct = Double(parts[3]) ?? 0
-            let name   = String(parts[10]).components(separatedBy: "/").last ?? String(parts[10])
+        // PSParser rejects the header because it carries no numeric pid.
+        for row in PSParser.parse(result) {
+            let pid    = row.pid
+            let cpuVal = row.cpuPercent
+            let memPct = row.memoryPercent
+            let name   = row.command
             guard cpuVal > 0 || memPct > 1 else { continue }
             // Read hw.memsize directly instead of depending on ram.totalGB, which is
             // written by fetchRAM in the same TaskGroup with no ordering guarantee and
@@ -444,17 +416,7 @@ class SystemMonitor: ObservableObject {
             return
         }
 
-        let days = seconds / 86_400
-        let hours = (seconds % 86_400) / 3_600
-        let minutes = (seconds % 3_600) / 60
-
-        if days > 0 {
-            uptime = "\(days)d \(hours)h \(minutes)m"
-        } else if hours > 0 {
-            uptime = "\(hours)h \(minutes)m"
-        } else {
-            uptime = "\(minutes)m"
-        }
+        uptime = UptimeFormatter.string(seconds: seconds) ?? "--"
     }
 
     // MARK: - Alerts

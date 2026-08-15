@@ -156,17 +156,13 @@ struct OverviewView: View {
     }
     
     func overallScore() -> (label: String, color: Color) {
-        let issues = [
-            monitor.cpu.total > 80,
-            monitor.ram.pressure > 0.85,
-            monitor.disk.usedPercent > 0.90,
-            monitor.ram.swapUsedGB > 1.0
-        ].filter { $0 }.count
-        
-        switch issues {
-        case 0: return ("All good - your Mac is healthy", .green)
-        case 1: return ("One issue to look at", .orange)
-        default: return ("Several issues detected", .red)
+        switch HealthVerdict.evaluate(cpuBusyPercent: monitor.cpu.total,
+                                      memoryOccupancy: monitor.ram.pressure,
+                                      diskOccupancy: monitor.disk.usedPercent,
+                                      swapUsedGB: monitor.ram.swapUsedGB) {
+        case .allGood:        return ("All good - your Mac is healthy", .green)
+        case .oneIssue:       return ("One issue to look at", .orange)
+        case .severalIssues:  return ("Several issues detected", .red)
         }
     }
 }

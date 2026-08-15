@@ -15,7 +15,21 @@
 		A006 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = F006 /* Views.swift */; };
 		A007 /* CleanerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F007 /* CleanerView.swift */; };
 		A008 /* ThermalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F009 /* ThermalView.swift */; };
+		A009 /* Metrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F010 /* Metrics.swift */; };
+		A010 /* LegacyShellParsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F011 /* LegacyShellParsers.swift */; };
+		TA01 /* MetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF01 /* MetricsTests.swift */; };
+		TA02 /* LegacyShellParsersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF02 /* LegacyShellParsersTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		TPROX /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = PROJ /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = TGT1;
+			remoteInfo = MacMonitor;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		F001 /* MacMonitorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMonitorApp.swift; sourceTree = "<group>"; };
@@ -27,11 +41,23 @@
 		F007 /* CleanerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanerView.swift; sourceTree = "<group>"; };
 		F008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F009 /* ThermalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalView.swift; sourceTree = "<group>"; };
+		F010 /* Metrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metrics.swift; sourceTree = "<group>"; };
+		F011 /* LegacyShellParsers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyShellParsers.swift; sourceTree = "<group>"; };
 		PROD /* MacMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MacMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		TF01 /* MetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricsTests.swift; sourceTree = "<group>"; };
+		TF02 /* LegacyShellParsersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyShellParsersTests.swift; sourceTree = "<group>"; };
+		TPRD /* MacMonitorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MacMonitorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		BLD1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BLD2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -45,6 +71,7 @@
 			isa = PBXGroup;
 			children = (
 				GRP1 /* MacMonitor */,
+				GRP3 /* MacMonitorTests */,
 				GRP2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -61,14 +88,26 @@
 				F007 /* CleanerView.swift */,
 				F008 /* Info.plist */,
 				F009 /* ThermalView.swift */,
+				F010 /* Metrics.swift */,
+				F011 /* LegacyShellParsers.swift */,
 			);
 			path = MacMonitor;
+			sourceTree = "<group>";
+		};
+		GRP3 /* MacMonitorTests */ = {
+			isa = PBXGroup;
+			children = (
+				TF01 /* MetricsTests.swift */,
+				TF02 /* LegacyShellParsersTests.swift */,
+			);
+			path = MacMonitorTests;
 			sourceTree = "<group>";
 		};
 		GRP2 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				PROD /* MacMonitor.app */,
+				TPRD /* MacMonitorTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -93,7 +132,33 @@
 			productReference = PROD /* MacMonitor.app */;
 			productType = "com.apple.product-type.application";
 		};
+		TGT2 /* MacMonitorTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CFG2 /* Build configuration list for PBXNativeTarget "MacMonitorTests" */;
+			buildPhases = (
+				SRC2 /* Sources */,
+				BLD2 /* Frameworks */,
+				RES2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				TDEP /* PBXTargetDependency */,
+			);
+			name = MacMonitorTests;
+			productName = MacMonitorTests;
+			productReference = TPRD /* MacMonitorTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXTargetDependency section */
+		TDEP /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = TGT1 /* MacMonitor */;
+			targetProxy = TPROX /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		PROJ /* Project object */ = {
@@ -105,6 +170,10 @@
 				TargetAttributes = {
 					TGT1 = {
 						CreatedOnToolsVersion = 15.0;
+					};
+					TGT2 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = TGT1;
 					};
 				};
 			};
@@ -122,12 +191,20 @@
 			projectRoot = "";
 			targets = (
 				TGT1 /* MacMonitor */,
+				TGT2 /* MacMonitorTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		RES1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		RES2 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -149,6 +226,17 @@
 				A006 /* Views.swift in Sources */,
 				A007 /* CleanerView.swift in Sources */,
 				A008 /* ThermalView.swift in Sources */,
+				A009 /* Metrics.swift in Sources */,
+				A010 /* LegacyShellParsers.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		SRC2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				TA01 /* MetricsTests.swift in Sources */,
+				TA02 /* LegacyShellParsersTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -315,6 +403,38 @@
 			};
 			name = Release;
 		};
+		BC05 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.youdcode.macmonitor.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MacMonitor.app/Contents/MacOS/MacMonitor";
+			};
+			name = Debug;
+		};
+		BC06 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.youdcode.macmonitor.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MacMonitor.app/Contents/MacOS/MacMonitor";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -335,6 +455,15 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
+		};
+		CFG2 /* Build configuration list for PBXNativeTarget "MacMonitorTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BC05 /* Debug */,
+				BC06 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 	};
