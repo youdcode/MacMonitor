@@ -39,6 +39,61 @@ final class NetworkMetricsTests: XCTestCase {
         }
     }
 
+    // MARK: - What a run costs
+
+    /// The rule stated before the button: ten seconds at one Mbit/s is 1.25 MB, and it
+    /// scales. Checked against every complete run measured while building this, rate
+    /// against bytes for the same run.
+    ///
+    /// Five per cent of slack, and it is spent almost entirely on one run: the 674
+    /// Mbit/s one lasted 10.5 seconds rather than 10, so it moved five per cent more
+    /// than the rule predicts. The other three land within one per cent.
+    ///
+    /// This bites if the ten seconds ever changes. Halve the duration and 1.25 becomes
+    /// 0.625, and every line here fails.
+    func testTheStatedRuleReproducesEveryRunThatWasMeasured() {
+        let runs: [(mbps: Double, megabytes: Double)] = [
+            (226, 285),   // upload, ten seconds
+            (263, 335),   // upload, through this application
+            (312, 390),   // download, ten seconds
+            (316, 395),   // download, through this application
+            (674, 885),   // download, ten and a half seconds
+            (688, 860),   // download, ten seconds
+        ]
+        for run in runs {
+            let predicted = run.mbps * SpeedTestFacts.megabytesPerMegabitPerSecond
+            XCTAssertEqual(predicted, run.megabytes, accuracy: run.megabytes * 0.05,
+                           "the rule missed the \(Int(run.mbps)) Mbit/s run")
+        }
+    }
+
+    /// The rating describes the download and nothing else. A fast download does not
+    /// become "slow" because the upstream is narrow, and a wide upstream does not
+    /// rescue a bad download. The boundaries were chosen for a download, and applying
+    /// them to an upload would call an ordinary 25 Mbit/s upstream slow.
+    func testTheRatingFollowsTheDownloadAndIgnoresTheUpload() {
+        let fastDownSlowUp = SpeedTestResult(downloadMegabitsPerSecond: 688, downloadBytes: 0,
+                                             uploadMegabitsPerSecond: 3, uploadBytes: 0,
+                                             uploadFailure: nil, server: "", finishedAt: Date())
+        XCTAssertEqual(fastDownSlowUp.tier, .veryFast)
+
+        let slowDownFastUp = SpeedTestResult(downloadMegabitsPerSecond: 3, downloadBytes: 0,
+                                             uploadMegabitsPerSecond: 688, uploadBytes: 0,
+                                             uploadFailure: nil, server: "", finishedAt: Date())
+        XCTAssertEqual(slowDownFastUp.tier, .verySlow)
+    }
+
+    /// An upload that did not complete leaves nothing behind rather than a zero. The
+    /// download is still a measurement and is still rated.
+    func testAnUnfinishedUploadIsAbsentRatherThanZero() {
+        let result = SpeedTestResult(downloadMegabitsPerSecond: 312, downloadBytes: 390_000_000,
+                                     uploadMegabitsPerSecond: nil, uploadBytes: 0,
+                                     uploadFailure: "the socket closed", server: "", finishedAt: Date())
+        XCTAssertNil(result.uploadMegabitsPerSecond)
+        XCTAssertEqual(result.tier, .fast)
+        XCTAssertEqual(result.totalBytes, 390_000_000)
+    }
+
     // MARK: - Gauge scale
 
     func testTheStopsAreOneAndOneThousand() {

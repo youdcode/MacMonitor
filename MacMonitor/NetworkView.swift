@@ -8,7 +8,7 @@ struct NetworkView: View {
         DetailScreen(title: "Network", subtitle: "All interfaces except loopback") {
             currentThroughput
             capacityTest
-            if case .finished(let result) = speedTest.state { capacityResult(result) }
+            dials
             totals
         }
     }
@@ -58,10 +58,12 @@ struct NetworkView: View {
     // MARK: - Capacity test
 
     private var capacityTest: some View {
-        StatCard(title: "Download speed test", icon: "gauge.high", iconColour: .indigo) {
+        StatCard(title: "Speed test", icon: "gauge.high", iconColour: .indigo) {
             // Stated before the button, not in a footnote: on a metered connection this
-            // is the whole decision.
-            Text("This test downloads about \(Int(SpeedTestFacts.approximateDownloadBytes / 1_000_000)) MB. It runs the ndt7 test against M-Lab servers, only when you start it, and never on its own.")
+            // is the whole decision. And stated as a rule rather than a single number,
+            // because the test fills the link for ten seconds each way and so costs
+            // whatever the link can carry.
+            Text("The test fills the link for ten seconds in each direction, so it moves about \(SpeedTestFacts.megabytesPerMegabitPerSecond, specifier: "%.2f") MB for every Mbit/s your connection carries - each way. On the machine this was written on that came to \(SpeedTestFacts.measuredDownloadMegabytes) MB down and \(SpeedTestFacts.measuredUploadMegabytes) MB up. It runs the ndt7 test against M-Lab servers, only when you start it, and never on its own.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -81,9 +83,10 @@ struct NetworkView: View {
             }
             .accessibilityElement(children: .combine)
 
-            Text("M-Lab allows \(SpeedTestFacts.dailyTestLimit) tests per client per day.")
+            Text("M-Lab allows \(SpeedTestFacts.dailyTestLimit) tests per client per day. One request to its server list covers both directions, so a full test costs one of them.")
                 .font(.caption2)
                 .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             Divider()
 
@@ -95,14 +98,14 @@ struct NetworkView: View {
                     Spacer()
                     Button("Cancel") { speedTest.cancel() }.buttonStyle(.bordered)
 
-                case .running(let progress, let mbps):
+                case .running(let direction, let progress, _, _):
                     ProgressView(value: progress)
                         .frame(width: 130)
                         .accessibilityLabel("Speed test progress")
                         .accessibilityValue(Format.percent(ratio: progress))
-                    Text(String(format: "%.0f Mbit/s", mbps))
-                        .font(.system(.body, design: .rounded).weight(.semibold))
-                        .monospacedDigit()
+                    Text(direction == .download ? "Measuring download..." : "Measuring upload...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     Spacer()
                     Button("Cancel") { speedTest.cancel() }.buttonStyle(.bordered)
 
@@ -110,7 +113,7 @@ struct NetworkView: View {
                     Button {
                         speedTest.start()
                     } label: {
-                        Label("Download speed test", systemImage: "arrow.down.circle")
+                        Label("Speed test", systemImage: "arrow.up.arrow.down.circle")
                     }
                     .buttonStyle(.borderedProminent)
                     Spacer()
@@ -129,50 +132,92 @@ struct NetworkView: View {
         }
     }
 
-    // MARK: - Capacity result
+    // MARK: - The dials
 
-    private func capacityResult(_ result: SpeedTestResult) -> some View {
-        StatCard(title: "Measured capacity", icon: result.tier.symbol, iconColour: result.tier.colour) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(format: "%.0f Mbit/s", result.megabitsPerSecond))
-                        .font(.system(.largeTitle, design: .rounded).weight(.semibold))
-                        .monospacedDigit()
+    /// One card, live during the test and kept afterwards. The dials appear as soon as
+    /// there is something to put on them and the needles climb while the test runs; a
+    /// progress bar alone would waste a measurement the protocol hands over for nothing.
+    @ViewBuilder
+    private var dials: some View {
+        switch speedTest.state {
+        case .running(_, _, let download, let upload):
+            dialCard(download: download, upload: upload, result: nil)
+        case .finished(let result):
+            dialCard(download: result.downloadMegabitsPerSecond,
+                     upload: result.uploadMegabitsPerSecond,
+                     result: result)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func dialCard(download: Double?, upload: Double?, result: SpeedTestResult?) -> some View {
+        StatCard(title: result == nil ? "Measuring capacity" : "Measured capacity",
+                 icon: result?.tier.symbol ?? "gauge.high",
+                 iconColour: result?.tier.colour ?? .indigo) {
+
+            HStack(alignment: .top, spacing: 20) {
+                VStack(spacing: 7) {
+                    SpeedGauge(megabitsPerSecond: download,
+                               caption: "Download",
+                               accessibilityName: "Download capacity",
+                               colour: .indigo)
+                    if let result {
+                        // The rating hangs under the download dial, which is what it
+                        // describes. Symbol as well as colour, so it survives greyscale
+                        // and a colour-blind reader.
+                        HStack(spacing: 5) {
+                            Image(systemName: result.tier.symbol).font(.caption)
+                            Text(result.tier.label).font(.caption)
+                        }
                         .foregroundColor(result.tier.colour)
-                    HStack(spacing: 5) {
-                        Image(systemName: result.tier.symbol)
-                            .font(.caption)
-                            .foregroundColor(result.tier.colour)
-                        Text(result.tier.label)
-                            .font(.caption)
-                            .foregroundColor(result.tier.colour)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Download rating")
+                        .accessibilityValue(result.tier.label)
                     }
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Measured download capacity")
-                .accessibilityValue("\(Int(result.megabitsPerSecond)) megabits per second, \(result.tier.label)")
 
-                Spacer()
+                SpeedGauge(megabitsPerSecond: upload,
+                           caption: "Upload",
+                           accessibilityName: "Upload capacity",
+                           colour: .indigo)
 
-                VStack(spacing: 5) {
-                    MetricRow(label: "Measured", value: result.finishedAt.formatted(date: .omitted, time: .standard))
-                    MetricRow(label: "Transferred", value: Format.bytes(Int64(result.bytesTransferred)))
-                    MetricRow(label: "Server", value: result.server.components(separatedBy: ".").first ?? result.server)
+                Spacer(minLength: 8)
+
+                if let result {
+                    VStack(spacing: 5) {
+                        MetricRow(label: "Measured", value: result.finishedAt.formatted(date: .omitted, time: .standard))
+                        MetricRow(label: "Downloaded", value: Format.bytes(Int64(result.downloadBytes)))
+                        MetricRow(label: "Uploaded", value: Format.bytes(Int64(result.uploadBytes)))
+                        MetricRow(label: "Server", value: result.server.components(separatedBy: ".").first ?? result.server)
+                    }
+                    .frame(width: 210)
                 }
-                .frame(width: 210)
             }
 
-            // Only ever computed from a measured capacity, never from idle throughput.
-            if let seconds = TransferEstimate.seconds(forBytes: TransferEstimate.fourKFilmBytes,
-                                                      atMegabitsPerSecond: result.megabitsPerSecond) {
-                Text("At this rate a 15 GB 4K film takes \(TransferEstimate.humanDuration(seconds: seconds)).")
-                    .font(.caption)
+            if let result {
+                if let failure = result.uploadFailure {
+                    Label("The upload half did not finish: \(failure)", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                // Only ever computed from a measured capacity, never from idle
+                // throughput, and from the download because that is the direction a
+                // film arrives in.
+                if let seconds = TransferEstimate.seconds(forBytes: TransferEstimate.fourKFilmBytes,
+                                                          atMegabitsPerSecond: result.downloadMegabitsPerSecond) {
+                    Text("At this download rate a 15 GB 4K film takes \(TransferEstimate.humanDuration(seconds: seconds)).")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Text("Capacity, measured by filling the link in each direction. The rating describes the download. Not comparable with the throughput above.")
+                    .font(.caption2)
                     .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-
-            Text("Capacity, measured by filling the link. Not comparable with the throughput above.")
-                .font(.caption2)
-                .foregroundColor(.secondary)
         }
     }
 
