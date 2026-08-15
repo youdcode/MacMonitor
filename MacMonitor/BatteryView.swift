@@ -26,7 +26,7 @@ struct BatteryView: View {
                     HStack(alignment: .top, spacing: 20) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("\(monitor.battery.percentage)%")
-                                .font(.system(size: 34, weight: .semibold, design: .rounded))
+                                .font(.system(.largeTitle, design: .rounded).weight(.semibold))
                                 .monospacedDigit()
                                 .foregroundColor(colour)
                             Text(stateLabel).font(.caption2).foregroundColor(.secondary)

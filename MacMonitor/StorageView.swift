@@ -18,7 +18,7 @@ struct StorageView: View {
                 HStack(alignment: .top, spacing: 20) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(Format.storage(monitor.disk.freeGB))
-                            .font(.system(size: 30, weight: .semibold, design: .rounded))
+                            .font(.system(.title, design: .rounded).weight(.semibold))
                             .monospacedDigit()
                             .foregroundColor(status.colour)
                         Text("available of \(Format.storage(monitor.disk.totalGB))")
@@ -54,7 +54,7 @@ struct StorageView: View {
                     HStack(spacing: 28) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(Format.rate(io.readBytesPerSecond))
-                                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                .font(.system(.title3, design: .rounded).weight(.semibold))
                                 .monospacedDigit()
                             Text("read").font(.caption2).foregroundColor(.secondary)
                         }
@@ -64,7 +64,7 @@ struct StorageView: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(Format.rate(io.writeBytesPerSecond))
-                                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                .font(.system(.title3, design: .rounded).weight(.semibold))
                                 .monospacedDigit()
                             Text("write").font(.caption2).foregroundColor(.secondary)
                         }

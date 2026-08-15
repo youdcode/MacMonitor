@@ -25,7 +25,7 @@ struct ProcessorView: View {
                 HStack(alignment: .top, spacing: 20) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(Format.percent(monitor.cpu.total))
-                            .font(.system(size: 30, weight: .semibold, design: .rounded))
+                            .font(.system(.title, design: .rounded).weight(.semibold))
                             .monospacedDigit()
                             .foregroundColor(cpuStatus.colour)
                         Text("in use")

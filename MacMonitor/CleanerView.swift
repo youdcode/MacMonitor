@@ -53,7 +53,7 @@ struct CleanerView: View {
                 if monitor.caches.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.seal.fill")
-                            .font(.system(size: 48))
+                            .font(.largeTitle)
                             .foregroundColor(.green)
                         Text("No cache above 10 MB")
                             .font(.title3)
@@ -218,48 +218,52 @@ struct CleanupReportCard: View {
 struct CacheRow: View {
     @Binding var item: CacheItem
 
+    /// The whole row is the Toggle's label, so the entire line is both the hit target
+    /// and the focus target. Before, only the checkbox could be reached from the
+    /// keyboard and the rest of the row was an onTapGesture, which is reachable by
+    /// neither the keyboard nor VoiceOver.
     var body: some View {
-        HStack(spacing: 12) {
-            Toggle(isOn: $item.isSelected) {
-                Text("Select \(item.name)")
-            }
-            .toggleStyle(.checkbox)
-            .labelsHidden()
-            .accessibilityLabel("Select \(item.name), \(Format.bytes(item.sizeBytes))")
-
-            Image(systemName: item.icon)
-                .foregroundColor(.secondary)
-                .frame(width: 18)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(item.name)
-                        .font(.system(size: 13))
-                        .fontWeight(.medium)
-                    if let app = item.runningAppName {
-                        Text("\(app) is running")
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.15))
-                            .foregroundColor(.orange)
-                            .clipShape(Capsule())
-                    }
-                }
-                Text(item.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~"))
-                    .font(.caption2)
+        Toggle(isOn: $item.isSelected) {
+            HStack(spacing: 10) {
+                Image(systemName: item.icon)
                     .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                    .frame(width: 16)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 6) {
+                        Text(item.name)
+                            .font(.callout)
+                            .fontWeight(.medium)
+                        if let app = item.runningAppName {
+                            Text("\(app) is running")
+                                .font(.caption2)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Color.orange.opacity(0.15))
+                                .foregroundColor(.orange)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    Text(item.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~"))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                Spacer()
+
+                Text(Format.bytes(item.sizeBytes))
+                    .font(.system(.callout, design: .rounded).weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundColor(item.sizeBytes > 1_000_000_000 ? .orange : .primary)
             }
-
-            Spacer()
-
-            Text(Format.bytes(item.sizeBytes))
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundColor(item.sizeBytes > 1_000_000_000 ? .orange : .primary)
-                .frame(width: 80, alignment: .trailing)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 8)
+        .toggleStyle(.checkbox)
+        .padding(.vertical, 6)
+        .accessibilityLabel(item.name)
+        .accessibilityValue("\(Format.bytes(item.sizeBytes))\(item.runningAppName.map { ", \($0) is running" } ?? "")")
+        .accessibilityHint("Select to move this cache to the Trash")
     }
 }

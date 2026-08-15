@@ -28,7 +28,7 @@ struct MemoryView: View {
                 HStack(alignment: .top, spacing: 20) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(Format.memory(monitor.ram.usedGB))
-                            .font(.system(size: 30, weight: .semibold, design: .rounded))
+                            .font(.system(.title, design: .rounded).weight(.semibold))
                             .monospacedDigit()
                             .foregroundColor(status.colour)
                         Text("of \(Format.memory(monitor.ram.totalGB))")

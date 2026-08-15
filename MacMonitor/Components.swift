@@ -34,6 +34,11 @@ struct RingGauge: View {
                     .rotationEffect(.degrees(-90))
                     .animation(.easeInOut(duration: 0.4), value: value)
                 Text(percentText)
+                    // Deliberately proportional to the ring rather than to the text
+                    // size setting: the glyph has to fit inside a circle of a known
+                    // diameter, and Dynamic Type would push it outside. The reading is
+                    // available to VoiceOver and repeated in the caption below, which
+                    // does scale.
                     .font(.system(size: size * 0.25, weight: .semibold, design: .rounded))
                     .monospacedDigit()
             }
@@ -188,9 +193,9 @@ struct StatCard<Content: View>: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .foregroundColor(iconColour)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.caption.weight(.medium))
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
             }
             .accessibilityAddTraits(.isHeader)
 

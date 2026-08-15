@@ -12,7 +12,7 @@ struct NetworkView: View {
                     HStack(spacing: 28) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(Format.rate(n.inBytesPerSecond))
-                                .font(.system(size: 26, weight: .semibold, design: .rounded))
+                                .font(.system(.title2, design: .rounded).weight(.semibold))
                                 .monospacedDigit()
                                 .foregroundColor(.indigo)
                             Text("down").font(.caption2).foregroundColor(.secondary)
@@ -23,7 +23,7 @@ struct NetworkView: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(Format.rate(n.outBytesPerSecond))
-                                .font(.system(size: 26, weight: .semibold, design: .rounded))
+                                .font(.system(.title2, design: .rounded).weight(.semibold))
                                 .monospacedDigit()
                                 .foregroundColor(.indigo)
                             Text("up").font(.caption2).foregroundColor(.secondary)
