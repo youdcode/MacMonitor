@@ -10,7 +10,7 @@ struct OverviewView: View {
                 // Header
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Vue d'ensemble")
+                        Text("Overview")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                         Text(monitor.macOS)
@@ -58,14 +58,14 @@ struct OverviewView: View {
                         value: monitor.ram.pressure,
                         color: .statusColor(for: monitor.ram.pressure),
                         size: 90,
-                        label: "RAM",
+                        label: "Memory",
                         sublabel: "\(formatGB(monitor.ram.usedGB)) / \(formatGB(monitor.ram.totalGB))"
                     )
                     RingGauge(
                         value: monitor.disk.usedPercent,
                         color: .statusColor(for: monitor.disk.usedPercent),
                         size: 90,
-                        label: "Disque",
+                        label: "Storage",
                         sublabel: "\(formatGB(monitor.disk.usedGB)) / \(formatGB(monitor.disk.totalGB))"
                     )
                     if monitor.battery.isPresent {
@@ -73,7 +73,7 @@ struct OverviewView: View {
                             value: Double(monitor.battery.percentage) / 100,
                             color: batteryColor(),
                             size: 90,
-                            label: "Batterie",
+                            label: "Battery",
                             sublabel: "\(monitor.battery.percentage)%"
                         )
                     }
@@ -84,48 +84,48 @@ struct OverviewView: View {
                 // Cards grid
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                     
-                    // CPU Card
+                    // CPU card
                     StatCard(title: "CPU", icon: "cpu", iconColor: .blue) {
                         Sparkline(data: monitor.cpu.history, longData: monitor.cpu.longHistory, color: .blue)
                         HStack {
-                            MetricRow(label: "Utilisateur", value: String(format: "%.1f%%", monitor.cpu.user))
+                            MetricRow(label: "User", value: String(format: "%.1f%%", monitor.cpu.user))
                             Spacer()
-                            MetricRow(label: "Système", value: String(format: "%.1f%%", monitor.cpu.system))
+                            MetricRow(label: "System", value: String(format: "%.1f%%", monitor.cpu.system))
                         }
                     }
                     
-                    // RAM Card
-                    StatCard(title: "RAM", icon: "memorychip", iconColor: .purple) {
+                    // Memory card
+                    StatCard(title: "Memory", icon: "memorychip", iconColor: .purple) {
                         Sparkline(data: monitor.ram.history.map { $0 }, color: .purple)
-                        MetricRow(label: "Utilisée", value: formatGB(monitor.ram.usedGB))
-                        MetricRow(label: "Libre", value: formatGB(monitor.ram.freeGB))
+                        MetricRow(label: "Used", value: formatGB(monitor.ram.usedGB))
+                        MetricRow(label: "Free", value: formatGB(monitor.ram.freeGB))
                         MetricRow(label: "Swap", value: formatGB(monitor.ram.swapUsedGB),
                                   color: monitor.ram.swapUsedGB > 0.5 ? .orange : .secondary)
                     }
                     
-                    // Disk Card
-                    StatCard(title: "Disque", icon: "internaldrive", iconColor: .teal) {
+                    // Storage card
+                    StatCard(title: "Storage", icon: "internaldrive", iconColor: .teal) {
                         ProgressBar(value: monitor.disk.usedPercent, color: .statusColor(for: monitor.disk.usedPercent))
-                        MetricRow(label: "Utilisé", value: formatGB(monitor.disk.usedGB))
-                        MetricRow(label: "Libre", value: formatGB(monitor.disk.freeGB),
+                        MetricRow(label: "Used", value: formatGB(monitor.disk.usedGB))
+                        MetricRow(label: "Free", value: formatGB(monitor.disk.freeGB),
                                   color: monitor.disk.freeGB < 20 ? .orange : .green)
                         MetricRow(label: "S.M.A.R.T.", value: monitor.disk.smartStatus, color: .green)
                     }
                     
-                    // Battery Card
+                    // Battery card
                     if monitor.battery.isPresent {
-                        StatCard(title: "Batterie", icon: "battery.100", iconColor: batteryColor()) {
+                        StatCard(title: "Battery", icon: "battery.100", iconColor: batteryColor()) {
                             ProgressBar(value: Double(monitor.battery.percentage) / 100, color: batteryColor())
-                            MetricRow(label: "État", value: monitor.battery.isCharging ? "En charge" : "Sur batterie")
+                            MetricRow(label: "Status", value: monitor.battery.isCharging ? "Charging" : "On battery")
                             MetricRow(label: "Cycles", value: "\(monitor.battery.cycleCount)")
-                            MetricRow(label: "Santé", value: monitor.battery.health,
+                            MetricRow(label: "Condition", value: monitor.battery.health,
                                       color: monitor.battery.health == "Normal" ? .green : .orange)
                         }
                     }
                 }
                 
-                // Top process quick view
-                StatCard(title: "Processus actifs", icon: "list.bullet", iconColor: .orange) {
+                // Top processes, quick view
+                StatCard(title: "Active processes", icon: "list.bullet", iconColor: .orange) {
                     ForEach(monitor.processes.prefix(5)) { proc in
                         HStack {
                             Text(proc.name)
@@ -165,9 +165,9 @@ struct OverviewView: View {
         ].filter { $0 }.count
         
         switch issues {
-        case 0: return ("Tout va bien — Mac en bonne santé", .green)
-        case 1: return ("Un point d'attention détecté", .orange)
-        default: return ("Plusieurs problèmes détectés", .red)
+        case 0: return ("All good - your Mac is healthy", .green)
+        case 1: return ("One issue to look at", .orange)
+        default: return ("Several issues detected", .red)
         }
     }
 }

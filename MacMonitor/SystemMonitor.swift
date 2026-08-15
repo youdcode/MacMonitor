@@ -12,8 +12,8 @@ struct CPUUsage {
     var system: Double
     var idle: Double
     var total: Double { user + system }
-    var history: [Double] = []         // 60 pts — 2 min live
-    var longHistory: [Double] = []     // 1800 pts — 1h
+    var history: [Double] = []         // 60 pts - 2 min live
+    var longHistory: [Double] = []     // 1800 pts - 1h
 }
 
 struct RAMUsage {
@@ -27,8 +27,8 @@ struct RAMUsage {
     var swapUsedGB: Double
     var swapTotalGB: Double
     var pressure: Double { totalGB > 0 ? usedGB / totalGB : 0 }
-    var history: [Double] = []         // 60 pts — 2 min live
-    var longHistory: [Double] = []     // 1800 pts — 1h
+    var history: [Double] = []         // 60 pts - 2 min live
+    var longHistory: [Double] = []     // 1800 pts - 1h
 }
 
 struct DiskUsage {
@@ -47,18 +47,18 @@ struct BatteryInfo {
     var cycleCount: Int
     var health: String
     var timeRemaining: String
-    var temperature: Double  // °C
+    var temperature: Double  // degrees Celsius
 }
 
 struct ThermalInfo {
-    var cpuTemp: Double      // niveau 0-100
+    var cpuTemp: Double      // level 0-100
     var gpuTemp: Double
     var batteryTemp: Double
     var nandTemp: Double
     var fanRPM: Int
     var fanMax: Int
-    var thermalLevel: String       // Nominal / Modéré / Élevé / Critique
-    var thermalDescription: String // Texte explicatif
+    var thermalLevel: String       // Nominal / Fair / Serious / Critical
+    var thermalDescription: String // Explanatory text
     var history: [Double] = []
 }
 
@@ -102,7 +102,7 @@ class SystemMonitor: ObservableObject {
     @Published var ram     = RAMUsage(totalGB: 0, usedGB: 0, freeGB: 0, activeGB: 0, inactiveGB: 0, wiredGB: 0, compressedGB: 0, swapUsedGB: 0, swapTotalGB: 0, history: Array(repeating: 0, count: 60), longHistory: Array(repeating: 0, count: 1800))
     @Published var disk    = DiskUsage(totalGB: 0, usedGB: 0, freeGB: 0, smartStatus: "Verified")
     @Published var battery = BatteryInfo(isPresent: false, percentage: 0, isCharging: false, isPlugged: false, cycleCount: 0, health: "Normal", timeRemaining: "--", temperature: 0)
-    @Published var thermal = ThermalInfo(cpuTemp: 0, gpuTemp: 0, batteryTemp: 0, nandTemp: 0, fanRPM: 0, fanMax: 100, thermalLevel: "Nominal", thermalDescription: "Chargement...", history: Array(repeating: 0, count: 60))
+    @Published var thermal = ThermalInfo(cpuTemp: 0, gpuTemp: 0, batteryTemp: 0, nandTemp: 0, fanRPM: 0, fanMax: 100, thermalLevel: "Nominal", thermalDescription: "Loading...", history: Array(repeating: 0, count: 60))
     @Published var processes: [AppProcess] = []
     @Published var caches: [CacheItem] = []
     @Published var alerts: [Alert] = []
@@ -114,7 +114,7 @@ class SystemMonitor: ObservableObject {
     @Published var powermetricsEnabled = false
 
     private var timer: Timer?
-    private var thermalTimer: Timer?  // moins fréquent car sudo
+    private var thermalTimer: Timer?  // less frequent: heavier to collect
     private var batteryStaticFetched = false
 
     init() {
@@ -130,7 +130,7 @@ class SystemMonitor: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { [weak self] in await self?.refreshAll() }
         }
-        // Powermetrics toutes les 5 secondes (plus lourd)
+        // Thermal state every 5 seconds (heavier)
         thermalTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task { [weak self] in await self?.fetchThermal() }
         }
@@ -171,7 +171,7 @@ class SystemMonitor: ObservableObject {
         }
     }
 
-    // MARK: - CPU (host_cpu_load_info delta — précis)
+    // MARK: - CPU (host_cpu_load_info delta)
 
     private var lastCPUTicks: (user: UInt32, sys: UInt32, idle: UInt32, nice: UInt32) = (0, 0, 0, 0)
 
@@ -217,7 +217,7 @@ class SystemMonitor: ObservableObject {
         cpu = CPUUsage(user: userVal, system: sysVal, idle: idleVal, history: history, longHistory: longHistory)
     }
 
-    // MARK: - RAM (fixed)
+    // MARK: - Memory
 
     func fetchRAM() async {
         var totalRAM: UInt64 = 0
@@ -241,7 +241,7 @@ class SystemMonitor: ObservableObject {
             else if key.contains("compressor")           { compressed = val * gb }
         }
 
-        // Vraie RAM utilisée = active + wired + compressed (inactive = libérable)
+        // Real used memory = active + wired + compressed (inactive is reclaimable)
         let used = active + wired + compressed
 
         let swapResult = await runShell("sysctl vm.swapusage")
@@ -300,10 +300,10 @@ class SystemMonitor: ObservableObject {
         let ttf        = info[kIOPSTimeToFullChargeKey]  as? Int ?? -1
 
         var timeStr = "--"
-        if isCharging && ttf > 0       { timeStr = "\(ttf / 60)h \(ttf % 60)m (charge)" }
-        else if !isCharging && tte > 0 { timeStr = "\(tte / 60)h \(tte % 60)m restant"  }
+        if isCharging && ttf > 0       { timeStr = "\(ttf / 60)h \(ttf % 60)m (charging)" }
+        else if !isCharging && tte > 0 { timeStr = "\(tte / 60)h \(tte % 60)m remaining"  }
 
-        // Fetch cycles & health seulement une fois au démarrage (lent)
+        // Cycles and health are fetched once at startup only (slow)
         var cycles = battery.cycleCount
         var health  = battery.health
         if !batteryStaticFetched {
@@ -324,7 +324,7 @@ class SystemMonitor: ObservableObject {
                               timeRemaining: timeStr, temperature: thermal.batteryTemp)
     }
 
-    // MARK: - Thermal (ProcessInfo.thermalState — seule API dispo sur macOS 26 / Apple Silicon)
+    // MARK: - Thermal (ProcessInfo.thermalState - the only API available on Apple Silicon)
 
     func fetchThermal() async {
         let state = ProcessInfo.processInfo.thermalState
@@ -333,7 +333,7 @@ class SystemMonitor: ObservableObject {
         powermetricsEnabled = true  // API dispo sans entitlement
 
         var history = thermal.history
-        // On encode le niveau comme valeur numérique pour le sparkline
+        // Encode the level as a numeric value so the sparkline can plot it
         let numericVal: Double
         switch state {
         case .nominal:  numericVal = 10
@@ -361,15 +361,15 @@ class SystemMonitor: ObservableObject {
     private func thermalStateInfo(_ state: ProcessInfo.ThermalState) -> (String, String) {
         switch state {
         case .nominal:
-            return ("Nominal", "Le Mac tourne à pleine puissance, tout est normal.")
+            return ("Nominal", "Running at full speed. Everything is normal.")
         case .fair:
-            return ("Modéré", "Légère chauffe détectée. Les performances peuvent être légèrement réduites.")
+            return ("Fair", "Slight warming detected. Performance may be reduced a little.")
         case .serious:
-            return ("Élevé", "Chauffe sérieuse. macOS réduit les performances pour refroidir.")
+            return ("Serious", "Serious heat. macOS is reducing performance to cool down.")
         case .critical:
-            return ("Critique", "Surchauffe critique ! Ferme des apps immédiatement.")
+            return ("Critical", "Critical overheating. Close some apps immediately.")
         @unknown default:
-            return ("Inconnu", "")
+            return ("Unknown", "")
         }
     }
 
@@ -408,32 +408,32 @@ class SystemMonitor: ObservableObject {
         var newAlerts: [Alert] = []
 
         if cpu.total > 85 {
-            newAlerts.append(Alert(message: "CPU à \(Int(cpu.total))% — charge très élevée", level: .warning, timestamp: Date(), icon: "cpu"))
+            newAlerts.append(Alert(message: "CPU at \(Int(cpu.total))% - very high load", level: .warning, timestamp: Date(), icon: "cpu"))
         }
         if ram.swapUsedGB > 1.5 {
-            newAlerts.append(Alert(message: "Swap élevé (\(String(format: "%.1f", ram.swapUsedGB)) Go) — pression RAM", level: .warning, timestamp: Date(), icon: "memorychip"))
+            newAlerts.append(Alert(message: "High swap (\(String(format: "%.1f", ram.swapUsedGB)) GB) - memory pressure", level: .warning, timestamp: Date(), icon: "memorychip"))
         }
         if disk.freeGB < 10 {
-            newAlerts.append(Alert(message: "Disque presque plein — \(String(format: "%.1f", disk.freeGB)) Go restants", level: .critical, timestamp: Date(), icon: "internaldrive"))
+            newAlerts.append(Alert(message: "Storage almost full - \(String(format: "%.1f", disk.freeGB)) GB left", level: .critical, timestamp: Date(), icon: "internaldrive"))
         }
         if thermal.cpuTemp > 90 {
-            newAlerts.append(Alert(message: "Température CPU critique : \(Int(thermal.cpuTemp))°C", level: .critical, timestamp: Date(), icon: "thermometer.high"))
+            newAlerts.append(Alert(message: "Critical CPU temperature: \(Int(thermal.cpuTemp))°C", level: .critical, timestamp: Date(), icon: "thermometer.high"))
         }
         if thermal.cpuTemp > 70 && thermal.cpuTemp <= 90 {
-            newAlerts.append(Alert(message: "Température CPU élevée : \(Int(thermal.cpuTemp))°C", level: .warning, timestamp: Date(), icon: "thermometer.medium"))
+            newAlerts.append(Alert(message: "High CPU temperature: \(Int(thermal.cpuTemp))°C", level: .warning, timestamp: Date(), icon: "thermometer.medium"))
         }
         if thermal.fanRPM > 4500 {
-            newAlerts.append(Alert(message: "Ventilateur à \(thermal.fanRPM) RPM — charge intensive", level: .warning, timestamp: Date(), icon: "wind"))
+            newAlerts.append(Alert(message: "Fan at \(thermal.fanRPM) RPM - heavy load", level: .warning, timestamp: Date(), icon: "wind"))
         }
         if battery.isPresent && battery.percentage < 15 && !battery.isPlugged {
-            newAlerts.append(Alert(message: "Batterie faible : \(battery.percentage)%", level: .critical, timestamp: Date(), icon: "battery.25"))
+            newAlerts.append(Alert(message: "Low battery: \(battery.percentage)%", level: .critical, timestamp: Date(), icon: "battery.25"))
         }
 
-        // Notification si nouvelle alerte critique
+        // Notify when a new critical alert appears
         let hadCritical = alerts.contains { $0.level == .critical }
         let hasCritical = newAlerts.contains { $0.level == .critical }
         if hasCritical && !hadCritical {
-            sendNotification(title: "⚠️ Mac Monitor", body: newAlerts.first(where: { $0.level == .critical })?.message ?? "Alerte critique")
+            sendNotification(title: "Mac Monitor", body: newAlerts.first(where: { $0.level == .critical })?.message ?? "Critical alert")
         }
 
         alerts = newAlerts

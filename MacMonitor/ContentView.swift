@@ -1,13 +1,13 @@
 import SwiftUI
 
 enum Tab: String, CaseIterable {
-    case overview  = "Vue d'ensemble"
-    case cpu       = "CPU & RAM"
-    case thermal   = "Thermique"
-    case disk      = "Disque"
-    case battery   = "Batterie"
-    case processes = "Processus"
-    case cleaner   = "Nettoyeur"
+    case overview  = "Overview"
+    case cpu       = "CPU & Memory"
+    case thermal   = "Thermal"
+    case disk      = "Storage"
+    case battery   = "Battery"
+    case processes = "Processes"
+    case cleaner   = "Cleaner"
 
     var icon: String {
         switch self {
@@ -57,7 +57,7 @@ struct ContentView: View {
                     Text(monitor.macModel)
                         .font(.caption)
                         .fontWeight(.medium)
-                    Text("Uptime : \(monitor.uptime)")
+                    Text("Uptime: \(monitor.uptime)")
                         .font(.caption2)
                         .foregroundColor(.secondary)
 

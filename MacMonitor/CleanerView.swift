@@ -14,10 +14,10 @@ struct CleanerView: View {
                 // Header
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Nettoyeur")
+                        Text("Cleaner")
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                        Text("Sélectionne les caches à supprimer")
+                        Text("Select the caches to remove")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -25,17 +25,17 @@ struct CleanerView: View {
                     Button {
                         Task { await monitor.fetchCaches() }
                     } label: {
-                        Label("Actualiser", systemImage: "arrow.clockwise")
+                        Label("Refresh", systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(.bordered)
                 }
                 
-                // Last clean result
+                // Last cleanup result
                 if monitor.lastCleanedGB > 0 {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
-                        Text(String(format: "%.1f Go libérés lors du dernier nettoyage", monitor.lastCleanedGB))
+                        Text(String(format: "%.1f GB freed in the last cleanup", monitor.lastCleanedGB))
                             .font(.subheadline)
                             .foregroundColor(.green)
                     }
@@ -50,28 +50,28 @@ struct CleanerView: View {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 48))
                             .foregroundColor(.green)
-                        Text("Aucun cache significatif trouvé")
+                        Text("No significant cache found")
                             .font(.title3)
                             .fontWeight(.medium)
-                        Text("Ton Mac est propre !")
+                        Text("Your Mac is clean!")
                             .foregroundColor(.secondary)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(40)
                 } else {
-                    StatCard(title: "Caches détectés", icon: "archivebox", iconColor: .orange) {
+                    StatCard(title: "Detected caches", icon: "archivebox", iconColor: .orange) {
                         VStack(spacing: 0) {
                             // Select all
                             HStack {
                                 Button(action: selectAll) {
-                                    Text("Tout sélectionner (sûr)")
+                                    Text("Select all (safe)")
                                         .font(.caption)
                                 }
                                 .buttonStyle(.borderless)
                                 .foregroundColor(.blue)
                                 
                                 Button(action: deselectAll) {
-                                    Text("Tout désélectionner")
+                                    Text("Deselect all")
                                         .font(.caption)
                                 }
                                 .buttonStyle(.borderless)
@@ -99,10 +99,10 @@ struct CleanerView: View {
                 if selectedCount > 0 {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("\(selectedCount) élément\(selectedCount > 1 ? "s" : "") sélectionné\(selectedCount > 1 ? "s" : "")")
+                            Text("\(selectedCount) item\(selectedCount > 1 ? "s" : "") selected")
                                 .font(.subheadline)
                                 .fontWeight(.medium)
-                            Text(String(format: "%.1f Go à libérer", selectedGB))
+                            Text(String(format: "%.1f GB to free", selectedGB))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -115,10 +115,10 @@ struct CleanerView: View {
                             if monitor.isCleaning {
                                 HStack(spacing: 6) {
                                     ProgressView().controlSize(.small)
-                                    Text("Nettoyage...")
+                                    Text("Cleaning...")
                                 }
                             } else {
-                                Label("Nettoyer la sélection", systemImage: "trash")
+                                Label("Clean selection", systemImage: "trash")
                             }
                         }
                         .buttonStyle(.borderedProminent)
@@ -136,7 +136,7 @@ struct CleanerView: View {
                     Image(systemName: "info.circle")
                         .foregroundColor(.secondary)
                         .font(.caption)
-                    Text("Seuls les caches marqués comme sûrs sont affichés. Les caches système sensibles sont exclus.")
+                    Text("Only caches marked as safe are shown. Sensitive system caches are excluded.")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -144,13 +144,13 @@ struct CleanerView: View {
             .padding(24)
         }
         .background(Color(NSColor.windowBackgroundColor))
-        .alert("Confirmer le nettoyage", isPresented: $showingConfirmation) {
-            Button("Annuler", role: .cancel) {}
-            Button("Supprimer", role: .destructive) {
+        .alert("Confirm cleanup", isPresented: $showingConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
                 monitor.cleanSelectedCaches()
             }
         } message: {
-            Text("Tu vas supprimer \(String(format: "%.1f Go", selectedGB)) de caches. Ces fichiers sont régénérés automatiquement par les apps.")
+            Text("You are about to delete \(String(format: "%.1f GB", selectedGB)) of caches. Apps regenerate these files automatically.")
         }
     }
     
@@ -180,9 +180,9 @@ struct CacheRow: View {
     
     var sizeLabel: String {
         if item.sizeGB >= 1 {
-            return String(format: "%.1f Go", item.sizeGB)
+            return String(format: "%.1f GB", item.sizeGB)
         } else {
-            return String(format: "%.0f Mo", item.sizeGB * 1024)
+            return String(format: "%.0f MB", item.sizeGB * 1024)
         }
     }
     
@@ -209,7 +209,7 @@ struct CacheRow: View {
             Spacer()
             
             if !item.isSafe {
-                Text("Système")
+                Text("System")
                     .font(.caption2)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)

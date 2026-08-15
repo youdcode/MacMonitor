@@ -43,7 +43,7 @@ struct RingGauge: View {
 
 struct Sparkline: View {
     var data: [Double]           // 60 pts live (2 min)
-    var longData: [Double] = []  // 1800 pts (1h) — pour m1/m5/m15/h1
+    var longData: [Double] = []  // 1800 pts (1h) - source for the m1/m5/m15/h1 averages
     var color: Color
     var height: CGFloat = 40
     var showAverages: Bool = true
@@ -52,7 +52,7 @@ struct Sparkline: View {
     private func movingAvg(points: Int) -> [Double] {
         guard !longData.isEmpty, points > 0 else { return [] }
         let src = longData
-        // On veut 60 points de sortie espacés sur toute la durée de src
+        // 60 output points, evenly spread over the whole span of src
         let outCount = 60
         guard src.count >= 2 else { return Array(repeating: src.last ?? 0, count: outCount) }
 
@@ -104,9 +104,9 @@ struct Sparkline: View {
             let globalMax = allData.max() ?? 1
             let safeMax   = globalMax < 0.01 ? 1.0 : globalMax
 
-            // Courbes moyennes (du plus ancien au plus récent = du plus transparent au plus opaque)
+            // Moving averages, oldest to newest = most transparent to most opaque
             let avgConfigs: [(pts: Int, opacity: Double, width: CGFloat)] = [
-                (1800, 0.20, 1.0),   // h1  — 1h
+                (1800, 0.20, 1.0),   // h1
                 (450,  0.30, 1.0),   // m15
                 (150,  0.40, 1.2),   // m5
                 (30,   0.55, 1.4),   // m1
@@ -132,7 +132,7 @@ struct Sparkline: View {
                     }
                 }
 
-                // Courbe live — la plus visible
+                // Live curve - the most visible one
                 makePath(data: data, in: geo, safeMax: safeMax)
                     .stroke(color, style: StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round))
             }
@@ -141,7 +141,7 @@ struct Sparkline: View {
     }
 }
 
-// MARK: - Légende des moyennes
+// MARK: - Moving-average legend
 struct SparklineLegend: View {
     var color: Color
 

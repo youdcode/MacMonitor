@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - CPU & RAM View
+// MARK: - CPU & Memory View
 
 struct CPURAMView: View {
     @ObservedObject var monitor: SystemMonitor
@@ -8,12 +8,12 @@ struct CPURAMView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("CPU & RAM")
+                Text("CPU & Memory")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                 
-                // CPU Section
-                StatCard(title: "Processeur", icon: "cpu", iconColor: .blue) {
+                // CPU section
+                StatCard(title: "Processor", icon: "cpu", iconColor: .blue) {
                     VStack(alignment: .leading, spacing: 12) {
                         Sparkline(data: monitor.cpu.history, longData: monitor.cpu.longHistory, color: .blue, height: 60)
                         SparklineLegend(color: .blue)
@@ -23,15 +23,15 @@ struct CPURAMView: View {
                                 Text(String(format: "%.1f%%", monitor.cpu.total))
                                     .font(.system(size: 36, weight: .bold, design: .rounded))
                                     .foregroundColor(.blue)
-                                Text("Utilisation totale")
+                                Text("Total usage")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
                             Spacer()
                             VStack(alignment: .leading, spacing: 8) {
-                                MetricRow(label: "Utilisateur", value: String(format: "%.1f%%", monitor.cpu.user))
-                                MetricRow(label: "Système", value: String(format: "%.1f%%", monitor.cpu.system))
-                                MetricRow(label: "Inactif", value: String(format: "%.1f%%", monitor.cpu.idle))
+                                MetricRow(label: "User", value: String(format: "%.1f%%", monitor.cpu.user))
+                                MetricRow(label: "System", value: String(format: "%.1f%%", monitor.cpu.system))
+                                MetricRow(label: "Idle", value: String(format: "%.1f%%", monitor.cpu.idle))
                             }
                             .frame(width: 200)
                         }
@@ -40,8 +40,8 @@ struct CPURAMView: View {
                     }
                 }
                 
-                // RAM Section
-                StatCard(title: "Mémoire RAM", icon: "memorychip", iconColor: .purple) {
+                // Memory section
+                StatCard(title: "Memory", icon: "memorychip", iconColor: .purple) {
                     VStack(alignment: .leading, spacing: 12) {
                         Sparkline(data: monitor.ram.history, longData: monitor.ram.longHistory, color: .purple, height: 60)
                         SparklineLegend(color: .purple)
@@ -51,7 +51,7 @@ struct CPURAMView: View {
                                 Text(formatGB(monitor.ram.usedGB))
                                     .font(.system(size: 36, weight: .bold, design: .rounded))
                                     .foregroundColor(.purple)
-                                Text("sur \(formatGB(monitor.ram.totalGB)) utilisés")
+                                Text("of \(formatGB(monitor.ram.totalGB)) used")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -60,8 +60,8 @@ struct CPURAMView: View {
                                 MetricRow(label: "Active", value: formatGB(monitor.ram.activeGB))
                                 MetricRow(label: "Inactive", value: formatGB(monitor.ram.inactiveGB))
                                 MetricRow(label: "Wired", value: formatGB(monitor.ram.wiredGB))
-                                MetricRow(label: "Compressée", value: formatGB(monitor.ram.compressedGB))
-                                MetricRow(label: "Libre", value: formatGB(monitor.ram.freeGB), color: .green)
+                                MetricRow(label: "Compressed", value: formatGB(monitor.ram.compressedGB))
+                                MetricRow(label: "Free", value: formatGB(monitor.ram.freeGB), color: .green)
                             }
                             .frame(width: 200)
                         }
@@ -73,10 +73,10 @@ struct CPURAMView: View {
                         // Swap
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Swap (mémoire virtuelle)")
+                                Text("Swap (virtual memory)")
                                     .font(.caption)
                                     .fontWeight(.medium)
-                                Text("Utilisé quand la RAM est pleine — signe de pression mémoire")
+                                Text("Used when memory is full - a sign of memory pressure")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             }
@@ -97,7 +97,7 @@ struct CPURAMView: View {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .foregroundColor(.orange)
                                     .font(.caption)
-                                Text("Swap élevé — libère de l'espace disque ou ferme des apps")
+                                Text("High swap - free up storage or close some apps")
                                     .font(.caption)
                                     .foregroundColor(.orange)
                             }
@@ -119,25 +119,25 @@ struct DiskView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Stockage")
+                Text("Storage")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                 
-                StatCard(title: "Disque principal", icon: "internaldrive", iconColor: .teal) {
+                StatCard(title: "Startup disk", icon: "internaldrive", iconColor: .teal) {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 24) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(formatGB(monitor.disk.freeGB))
                                     .font(.system(size: 36, weight: .bold, design: .rounded))
                                     .foregroundColor(.teal)
-                                Text("disponibles sur \(formatGB(monitor.disk.totalGB))")
+                                Text("available of \(formatGB(monitor.disk.totalGB))")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
                             Spacer()
                             VStack(alignment: .leading, spacing: 8) {
-                                MetricRow(label: "Utilisé", value: formatGB(monitor.disk.usedGB))
-                                MetricRow(label: "Libre", value: formatGB(monitor.disk.freeGB),
+                                MetricRow(label: "Used", value: formatGB(monitor.disk.usedGB))
+                                MetricRow(label: "Free", value: formatGB(monitor.disk.freeGB),
                                           color: monitor.disk.freeGB < 20 ? .orange : .green)
                                 MetricRow(label: "Total", value: formatGB(monitor.disk.totalGB))
                                 MetricRow(label: "S.M.A.R.T.", value: monitor.disk.smartStatus, color: .green)
@@ -151,7 +151,7 @@ struct DiskView: View {
                             height: 10
                         )
                         
-                        Text("\(Int(monitor.disk.usedPercent * 100))% utilisé")
+                        Text("\(Int(monitor.disk.usedPercent * 100))% used")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
@@ -160,7 +160,7 @@ struct DiskView: View {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .foregroundColor(.orange)
                                     .font(.caption)
-                                Text("Disque presque plein — va dans le Nettoyeur pour libérer de l'espace")
+                                Text("Storage almost full - open Cleaner to free up space")
                                     .font(.caption)
                                     .foregroundColor(.orange)
                             }
@@ -182,15 +182,15 @@ struct BatteryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Batterie")
+                Text("Battery")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                 
                 if !monitor.battery.isPresent {
-                    Text("Aucune batterie détectée (Mac branché sans batterie)")
+                    Text("No battery detected (desktop Mac)")
                         .foregroundColor(.secondary)
                 } else {
-                    StatCard(title: "État de la batterie", icon: "battery.100", iconColor: batteryColor()) {
+                    StatCard(title: "Battery status", icon: "battery.100", iconColor: batteryColor()) {
                         VStack(alignment: .leading, spacing: 16) {
                             HStack(spacing: 24) {
                                 VStack(alignment: .leading, spacing: 4) {
@@ -206,14 +206,14 @@ struct BatteryView: View {
                                         Image(systemName: monitor.battery.isCharging ? "bolt.fill" : (monitor.battery.isPlugged ? "powerplug.fill" : "battery.25"))
                                             .foregroundColor(batteryColor())
                                             .font(.caption)
-                                        Text(monitor.battery.isCharging ? "En charge" : (monitor.battery.isPlugged ? "Branché (chargé)" : "Sur batterie"))
+                                        Text(monitor.battery.isCharging ? "Charging" : (monitor.battery.isPlugged ? "Plugged in (charged)" : "On battery"))
                                             .font(.caption)
                                             .foregroundColor(.secondary)
                                     }
                                 }
                                 Spacer()
                                 VStack(alignment: .leading, spacing: 8) {
-                                    MetricRow(label: "Temps restant", value: monitor.battery.timeRemaining)
+                                    MetricRow(label: "Time remaining", value: monitor.battery.timeRemaining)
                                     MetricRow(label: "Cycles", value: "\(monitor.battery.cycleCount)",
                                               color: monitor.battery.cycleCount > 800 ? .orange : .primary)
                                     MetricRow(label: "Condition", value: monitor.battery.health,
@@ -230,7 +230,7 @@ struct BatteryView: View {
                                     Image(systemName: "exclamationmark.triangle.fill")
                                         .foregroundColor(.orange)
                                         .font(.caption)
-                                    Text("Nombre de cycles élevé (\(monitor.battery.cycleCount)/1000) — la batterie approche de sa fin de vie")
+                                    Text("High cycle count (\(monitor.battery.cycleCount)/1000) - the battery is nearing end of life")
                                         .font(.caption)
                                         .foregroundColor(.orange)
                                 }
@@ -239,7 +239,7 @@ struct BatteryView: View {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundColor(.green)
                                         .font(.caption)
-                                    Text("Batterie en bonne santé (\(monitor.battery.cycleCount) cycles sur ~1000 max)")
+                                    Text("Battery in good health (\(monitor.battery.cycleCount) of ~1000 cycles)")
                                         .font(.caption)
                                         .foregroundColor(.green)
                                 }
@@ -248,11 +248,11 @@ struct BatteryView: View {
                     }
                     
                     // Tips
-                    StatCard(title: "Conseils", icon: "lightbulb", iconColor: .yellow) {
+                    StatCard(title: "Tips", icon: "lightbulb", iconColor: .yellow) {
                         VStack(alignment: .leading, spacing: 8) {
-                            tipRow(icon: "bolt.slash", text: "Ne charge pas à 100% en permanence — 20-80% est idéal")
-                            tipRow(icon: "thermometer.medium", text: "Évite les environnements chauds, ils dégradent la batterie")
-                            tipRow(icon: "moon.fill", text: "Active le mode 'Batterie optimisée' dans les Réglages")
+                            tipRow(icon: "bolt.slash", text: "Avoid keeping it at 100% all the time - 20-80% is ideal")
+                            tipRow(icon: "thermometer.medium", text: "Avoid hot environments, they degrade the battery")
+                            tipRow(icon: "moon.fill", text: "Turn on Optimized Battery Charging in System Settings")
                         }
                     }
                 }
@@ -291,23 +291,23 @@ struct ProcessesView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
-                    Text("Processus")
+                    Text("Processes")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     Spacer()
-                    Button("Actualiser") {
+                    Button("Refresh") {
                         Task { await monitor.fetchProcesses() }
                     }
                     .buttonStyle(.bordered)
                 }
                 
-                StatCard(title: "Top processus par CPU", icon: "cpu", iconColor: .orange) {
+                StatCard(title: "Top processes by CPU", icon: "cpu", iconColor: .orange) {
                     VStack(spacing: 0) {
                         // Header
                         HStack {
-                            Text("Processus").font(.caption).fontWeight(.semibold).foregroundColor(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                            Text("Processes").font(.caption).fontWeight(.semibold).foregroundColor(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                             Text("CPU").font(.caption).fontWeight(.semibold).foregroundColor(.secondary).frame(width: 60, alignment: .trailing)
-                            Text("Mémoire").font(.caption).fontWeight(.semibold).foregroundColor(.secondary).frame(width: 80, alignment: .trailing)
+                            Text("Memory").font(.caption).fontWeight(.semibold).foregroundColor(.secondary).frame(width: 80, alignment: .trailing)
                             Text("PID").font(.caption).fontWeight(.semibold).foregroundColor(.secondary).frame(width: 50, alignment: .trailing)
                         }
                         .padding(.bottom, 8)

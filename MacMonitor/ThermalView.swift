@@ -5,18 +5,18 @@ struct ThermalView: View {
 
     var levelColor: Color {
         switch monitor.thermal.thermalLevel {
-        case "Critique": return .red
-        case "Élevé":    return .orange
-        case "Modéré":   return .yellow
+        case "Critical": return .red
+        case "Serious":  return .orange
+        case "Fair":     return .yellow
         default:         return .green
         }
     }
 
     var levelIcon: String {
         switch monitor.thermal.thermalLevel {
-        case "Critique": return "thermometer.high"
-        case "Élevé":    return "thermometer.medium"
-        case "Modéré":   return "thermometer.low"
+        case "Critical": return "thermometer.high"
+        case "Serious":  return "thermometer.medium"
+        case "Fair":     return "thermometer.low"
         default:         return "thermometer"
         }
     }
@@ -28,22 +28,22 @@ struct ThermalView: View {
                 // Header
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Thermique")
+                        Text("Thermal")
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                        Text("État thermique système en temps réel")
+                        Text("Live system thermal state")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
                     Spacer()
                 }
 
-                // Info Apple Silicon
+                // Apple Silicon note
                 HStack(spacing: 8) {
                     Image(systemName: "info.circle")
                         .foregroundColor(.secondary)
                         .font(.caption)
-                    Text("Sur Apple Silicon (M4 Pro), macOS 26 ne permet pas l'accès aux températures en °C depuis des apps tierces. L'état thermique système reste disponible.")
+                    Text("On Apple Silicon, macOS does not expose CPU or GPU temperatures in degrees Celsius to third-party apps. The system thermal state is still available.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -51,14 +51,14 @@ struct ThermalView: View {
                 .background(Color.secondary.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
-                // État thermique principal — grande carte
-                StatCard(title: "État thermique", icon: levelIcon, iconColor: levelColor) {
+                // Main thermal state - large card
+                StatCard(title: "Thermal state", icon: levelIcon, iconColor: levelColor) {
                     VStack(alignment: .leading, spacing: 16) {
 
-                        // Sparkline historique
+                        // History sparkline
                         Sparkline(data: monitor.thermal.history, color: levelColor, height: 40, showAverages: false)
 
-                        // Badge niveau
+                        // Level badge
                         HStack(spacing: 12) {
                             ZStack {
                                 Circle()
@@ -79,7 +79,7 @@ struct ThermalView: View {
                             }
                         }
 
-                        // Barre visuelle du niveau
+                        // Visual level bar
                         VStack(alignment: .leading, spacing: 4) {
                             ProgressBar(value: monitor.thermal.cpuTemp / 100.0, color: levelColor, height: 10)
                             HStack {
@@ -87,7 +87,7 @@ struct ThermalView: View {
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                                 Spacer()
-                                Text("Critique")
+                                Text("Critical")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             }
@@ -95,46 +95,46 @@ struct ThermalView: View {
                     }
                 }
 
-                // Grille des 4 états possibles
-                StatCard(title: "Niveaux possibles", icon: "list.bullet", iconColor: .secondary) {
+                // Grid of the four possible states
+                StatCard(title: "Possible levels", icon: "list.bullet", iconColor: .secondary) {
                     VStack(spacing: 12) {
                         ThermalLevelRow(
                             level: "Nominal",
-                            description: "Pleine puissance, aucune limitation",
+                            description: "Full speed, no throttling",
                             color: .green,
                             icon: "thermometer",
                             isActive: monitor.thermal.thermalLevel == "Nominal"
                         )
                         Divider()
                         ThermalLevelRow(
-                            level: "Modéré",
-                            description: "Légère réduction de performance",
+                            level: "Fair",
+                            description: "Slight performance reduction",
                             color: .yellow,
                             icon: "thermometer.low",
-                            isActive: monitor.thermal.thermalLevel == "Modéré"
+                            isActive: monitor.thermal.thermalLevel == "Fair"
                         )
                         Divider()
                         ThermalLevelRow(
-                            level: "Élevé",
-                            description: "Réduction significative — macOS intervient",
+                            level: "Serious",
+                            description: "Significant reduction - macOS is stepping in",
                             color: .orange,
                             icon: "thermometer.medium",
-                            isActive: monitor.thermal.thermalLevel == "Élevé"
+                            isActive: monitor.thermal.thermalLevel == "Serious"
                         )
                         Divider()
                         ThermalLevelRow(
-                            level: "Critique",
-                            description: "Surchauffe — ferme des apps immédiatement",
+                            level: "Critical",
+                            description: "Overheating - close some apps immediately",
                             color: .red,
                             icon: "thermometer.high",
-                            isActive: monitor.thermal.thermalLevel == "Critique"
+                            isActive: monitor.thermal.thermalLevel == "Critical"
                         )
                     }
                 }
 
-                // Alertes
+                // Alerts
                 if !monitor.alerts.isEmpty {
-                    StatCard(title: "Alertes actives", icon: "bell.badge", iconColor: .red) {
+                    StatCard(title: "Active alerts", icon: "bell.badge", iconColor: .red) {
                         VStack(spacing: 8) {
                             ForEach(monitor.alerts) { alert in
                                 HStack(spacing: 10) {
@@ -155,7 +155,7 @@ struct ThermalView: View {
                 } else {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.shield.fill").foregroundColor(.green)
-                        Text("Aucune alerte — tout est normal")
+                        Text("No alerts - everything is normal")
                             .font(.subheadline).foregroundColor(.green)
                     }
                     .padding(14)
@@ -194,7 +194,7 @@ struct ThermalLevelRow: View {
             }
             Spacer()
             if isActive {
-                Text("ACTUEL")
+                Text("CURRENT")
                     .font(.caption2)
                     .fontWeight(.bold)
                     .foregroundColor(color)
