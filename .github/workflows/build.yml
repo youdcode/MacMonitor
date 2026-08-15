@@ -1,0 +1,39 @@
+name: Build
+
+# Builds the app and runs the test target on a GitHub-hosted Mac.
+#
+# macos-latest resolved to macOS 26 on arm64 when this was written, which is the same
+# major version the project was developed on. The destination says `platform=macOS`
+# with no architecture, so it resolves to whichever Mac the runner is, rather than
+# failing outright if the label ever points at an Intel image again.
+#
+# Code signing is deliberately left alone. The project signs ad hoc
+# (CODE_SIGN_IDENTITY = "-", no development team), which needs no certificate and no
+# secrets. Passing CODE_SIGNING_ALLOWED=NO would be worse than useless here: on Apple
+# Silicon an unsigned binary cannot execute at all, so the test host would fail to
+# launch.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record the toolchain
+        run: sw_vers
+
+      - name: Record the Xcode version
+        run: xcodebuild -version
+
+      - name: Build
+        run: xcodebuild build -scheme MacMonitor -destination 'platform=macOS' -derivedDataPath .build
+
+      - name: Test
+        run: xcodebuild test -scheme MacMonitor -destination 'platform=macOS' -derivedDataPath .build
