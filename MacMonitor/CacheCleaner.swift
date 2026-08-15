@@ -10,7 +10,7 @@ import AppKit
 
 // MARK: - Path validation
 
-/// Whether a path may be handed to the trash.
+/// Whether a path may be handed to the Trash.
 ///
 /// Pure and filesystem-free: the caller resolves symlinks and passes the result in,
 /// so the rules can be tested without creating files. The check is on the RESOLVED
@@ -149,9 +149,9 @@ struct CacheRemovalReport: Equatable {
     var outcomes: [CacheRemovalOutcome] = []
     var wasDryRun: Bool = false
 
-    /// Bytes actually moved to the trash.
+    /// Bytes actually moved to the Trash.
     ///
-    /// Note this is bytes MOVED, not bytes freed on the volume: the trash sits on
+    /// Note this is bytes MOVED, not bytes freed on the volume: the Trash sits on
     /// the same filesystem, so nothing is reclaimed until it is emptied. The UI says
     /// so rather than claiming free space it has not created.
     var movedBytes: Int64 { outcomes.reduce(0) { $0 + $1.reclaimedBytes } }

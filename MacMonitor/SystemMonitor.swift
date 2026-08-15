@@ -58,7 +58,7 @@ struct BatteryInfo {
 struct ThermalInfo {
     /// ProcessInfo.thermalState encoded on a 0-100 scale so the sparkline can plot it.
     /// This is NOT a temperature. On the machine tested - a Mac16,8 running
-    /// macOS 26.3 - no CPU or GPU temperature was reachable from a third-party
+    /// macOS 26.5 (build 25F71) - no CPU or GPU temperature was reachable from a third-party
     /// process: powermetrics has no `smc` sampler any more, and its `thermal`
     /// sampler reports pressure notifications rather than degrees.
     var thermalLevelValue: Double
@@ -260,12 +260,17 @@ class SystemMonitor: ObservableObject {
     ///
     /// Clears the previous screen's readings so a stale number cannot be shown as if
     /// it were live when the user comes back to it.
+    ///
+    /// Every scoped reading, not most of them: the P/E split and the battery sensors
+    /// were being left behind, which made the sentence above false for two screens out
+    /// of four.
     func setVisibleScope(_ scope: CollectionScope) {
         guard scope != visibleScope else { return }
         visibleScope = scope
-        if scope != .processor { gpu = nil }
+        if scope != .processor { gpu = nil; clusterLoad = NativeCPU.ClusterLoad(performance: nil, efficiency: nil) }
         if scope != .storage { diskIORate = nil; lastDiskIO = nil }
-        if scope != .network { networkRate = nil; lastNetwork = nil }
+        if scope != .network { networkRate = nil; networkTotals = nil; lastNetwork = nil }
+        if scope != .battery { batteryDetail = nil }
         Task { await self.fetchScopedDetail() }
     }
 
@@ -773,7 +778,7 @@ class SystemMonitor: ObservableObject {
         return total
     }
 
-    /// Moves the selected caches to the trash.
+    /// Moves the selected caches to the Trash.
     ///
     /// Trash rather than delete: that is what the Finder does, and it makes a wrong
     /// click recoverable without taking anything away from the user.

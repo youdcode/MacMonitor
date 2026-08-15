@@ -13,10 +13,13 @@ final class LegacyShellParsersTests: XCTestCase {
 
     // MARK: - ps
 
-    /// Real output of `ps aux | sort -rk3 | head -4`, the exact pipeline the app runs.
-    /// The header is on line FOUR, not line one, because `sort` sorted it along with
-    /// the rows. The original code called dropFirst() to skip "the header" and so
-    /// discarded WindowServer at 34.2%, the busiest process on the machine.
+    /// Real output of `ps aux | sort -rk3 | head -4`. The app runs the same pipeline
+    /// with `head -15`; only the row count differs, and four rows are enough to put the
+    /// header where it really lands.
+    ///
+    /// Which is line FOUR, not line one, because `sort` sorted it along with the rows.
+    /// The original code called dropFirst() to skip "the header" and so discarded
+    /// WindowServer at 34.2%, the busiest process on the machine.
     private let psFixture = """
     _windowserver      402  34.2  0.5 438477600 127008   ??  Rs   Fri08AM 232:02.44 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
     younes           94734  28.0  0.9 436597056 234432   ??  R    12:47PM   0:17.84 /System/Library/Services/AppleSpell.service/Contents/MacOS/AppleSpell

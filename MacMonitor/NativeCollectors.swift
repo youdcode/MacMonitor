@@ -439,7 +439,7 @@ enum NativeHardware {
 struct BatteryDetail: Equatable {
     /// Degrees Celsius, from AppleSmartBattery.
     ///
-    /// On the machine this was built against - a Mac16,8 running macOS 26.3 - this
+    /// On the machine this was built against - a Mac16,8 running macOS 26.5 (build 25F71) - this
     /// was the only temperature reachable from a third-party process. powermetrics
     /// does not expose the others at all any more: its sampler list has no `smc`
     /// entry, and the `thermal` sampler it does have reports pressure notifications
