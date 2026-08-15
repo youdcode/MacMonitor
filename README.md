@@ -23,8 +23,8 @@ Dark: [Overview](docs/images/overview-dark.png) ·
 </details>
 
 Every reading in those is live, from this machine, at the moment of the capture. The
-Network screen shows a real ndt7 run against `mlab3-par05` — 521 Mbit/s down and 399
-up, 1.2 GB moved — beside a current throughput of 13 kB/s, which is the pair of numbers
+Network screen shows a real ndt7 run against `mlab2-par05` — 680 Mbit/s down and 307
+up, 1.2 GB moved — beside a current throughput of 3 kB/s, which is the pair of numbers
 this README spends a section on.
 
 ## What it measures

@@ -68,7 +68,7 @@ struct NetworkView: View {
             // else and most wrong for the people on a slow line - the ones the warning
             // is for.
             if let last = speedTest.lastVolume {
-                Text("Your last test, on \(last.at.formatted(date: .abbreviated, time: .omitted)), moved \(Format.bytes(Int64(last.downloadBytes))) down and \(Format.bytes(Int64(last.uploadBytes))) up: \(Format.bytes(Int64(last.totalBytes))) in all.")
+                Text("Your last test, on \(last.at.formatted(date: .abbreviated, time: .omitted)), moved \(Format.bytes(Int64(last.downloadBytes))) down and \(Format.bytes(Int64(last.uploadBytes))) up: \(Format.bytes(Int64(last.totalBytes))) in all. It runs the ndt7 test against M-Lab servers, only when you start it, and never on its own.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -78,16 +78,11 @@ struct NetworkView: View {
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text("The test fills the link for ten seconds in each direction, so what it moves is not a fixed amount: it follows what your connection carries, about \(SpeedTestFacts.megabytesPerMegabitPerSecond, specifier: "%.2f") MB for every Mbit/s, each way. After the first run this line says what yours actually cost.")
+                Text("The test fills the link for ten seconds in each direction, so what it moves is not a fixed amount: it follows what your connection carries, about \(SpeedTestFacts.megabytesPerMegabitPerSecond, specifier: "%.2f") MB for every Mbit/s, each way. After the first run this line says what yours actually cost. It runs the ndt7 test against M-Lab servers, only when you start it, and never on its own.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-
-            Text("It runs the ndt7 test against M-Lab servers, only when you start it, and never on its own.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
 
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: "exclamationmark.triangle.fill")
