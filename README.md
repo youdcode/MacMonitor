@@ -245,9 +245,15 @@ stating a property of one toolchain as a property of this repository.
 
 The gate here has never been *no warnings*, it is *no unexplained warning*, and that
 now means these two and nothing else. **A third warning of any kind is a defect, not a
-fact about Xcode.** CI counts the linker warnings after the test step and fails above
-two, so a new one cannot arrive quietly in a log nobody reads to the end. An
-incremental run prints none of them, because the linker does not run at all.
+fact about Xcode.**
+
+CI counts them after the test step and requires *exactly* two, not at most two. A
+runner is a fresh machine with nothing cached, so the linker always runs and the pair is
+always emitted — which means the exact number can be demanded, and demanding it is what
+stops the check disarming itself: if the wording of `ld: warning:` ever changed, "at
+most two" would quietly pass on a count of zero and guard nothing. Now a change fails in
+either direction. Locally, an incremental run prints none of them, because the linker
+does not run at all.
 
 ## Known gaps
 

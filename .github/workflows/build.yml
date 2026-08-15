@@ -54,18 +54,36 @@ jobs:
       # run at all. Both cases sit under the limit, so the step only speaks up when the
       # count grows.
       #
-      # Two limits, stated rather than papered over. It catches a THIRD warning, not a
-      # substituted one - two different ld warnings would still count two, which is why
-      # the step prints them for a human to read. And if Apple ever changes the
-      # "ld: warning:" prefix, the count falls to zero and this quietly stops guarding
-      # rather than failing at random, which is the safer of the two directions to break
-      # in but is still a way of breaking.
-      - name: Two linker warnings, and no others
+      # EXACTLY two, not at most two. "At most" could disarm itself in silence: if the
+      # "ld: warning:" wording ever changed, the count would fall to zero, the step would
+      # pass, and it would have stopped guarding anything without saying so. Requiring
+      # the exact number makes a change fail in either direction.
+      #
+      # That is only safe because a runner is a fresh machine. Checked before relying on
+      # it: this workflow has no cache step, so .build never survives between runs; the
+      # Build step emits none of these warnings because it does not link the test bundle;
+      # and the Test step emits both, whether or not Build ran first. ONLY_ACTIVE_ARCH is
+      # YES and ARCHS resolves to a single architecture, so the linker runs once per
+      # binary rather than once per slice. Measured twice through the whole sequence: 0
+      # then 2, both times.
+      #
+      # IF A CACHE STEP IS EVER ADDED, this exactness dies with it - an incremental run
+      # links nothing and prints zero, which now fails. Go back to -gt 2 in that case, or
+      # do not cache DerivedData.
+      #
+      # The limit that remains: it catches a THIRD warning, not a substituted one. Two
+      # different ld warnings would still count two, which is why the step prints them
+      # for a human to read against the pair quoted in the README.
+      - name: Exactly two linker warnings
         run: |
           count=$(grep -c 'ld: warning:' test.log || true)
           echo "linker warnings: $count"
           grep 'ld: warning:' test.log || true
+          if [ "$count" -lt 2 ]; then
+            echo "::error::$count linker warnings, expected exactly 2. Either the linker did not run - a DerivedData cache would do that - or the 'ld: warning:' wording has changed and this step has stopped guarding anything."
+            exit 1
+          fi
           if [ "$count" -gt 2 ]; then
-            echo "::error::$count linker warnings. Two are expected, from XCTest being built for macOS 14; anything beyond them is a defect, not a fact about Xcode."
+            echo "::error::$count linker warnings, expected exactly 2. The two known ones come from XCTest being built for macOS 14 while the test bundle is declared for 13; anything beyond them is a defect, not a fact about Xcode."
             exit 1
           fi
