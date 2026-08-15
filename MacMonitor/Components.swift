@@ -276,6 +276,13 @@ func formatMemoryGB(_ gb: Double) -> String {
     return String(format: "%.1f GB", gb)
 }
 
+/// Formats a raw byte count in decimal units, the way Finder shows file sizes.
+func formatBytes(_ bytes: Int64) -> String {
+    let gb = Double(bytes) / 1_000_000_000
+    if gb >= 1 { return String(format: "%.1f GB", gb) }
+    return "\(bytes / 1_000_000) MB"
+}
+
 /// Formats a value already expressed in DECIMAL gigabytes (10^9). Use for storage,
 /// which is how Finder and System Settings count it.
 func formatStorageGB(_ gb: Double) -> String {

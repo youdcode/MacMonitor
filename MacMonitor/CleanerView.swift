@@ -3,21 +3,24 @@ import SwiftUI
 struct CleanerView: View {
     @ObservedObject var monitor: SystemMonitor
     @State private var showingConfirmation = false
-    
-    var selectedCount: Int { monitor.caches.filter { $0.isSelected }.count }
-    var selectedGB: Double { monitor.caches.filter { $0.isSelected }.reduce(0) { $0 + $1.sizeGB } }
-    
+
+    var selected: [CacheItem] { monitor.caches.filter(\.isSelected) }
+    var selectedBytes: Int64 { selected.reduce(0) { $0 + $1.sizeBytes } }
+    var totalBytes: Int64 { monitor.caches.reduce(0) { $0 + $1.sizeBytes } }
+    var selectedRunningApps: [String] {
+        Array(Set(selected.compactMap(\.runningAppName))).sorted()
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                
-                // Header
+
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Cleaner")
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                        Text("Select the caches to remove")
+                        Text("Caches found on this Mac, largest first")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -29,147 +32,178 @@ struct CleanerView: View {
                     }
                     .buttonStyle(.bordered)
                 }
-                
-                // Last cleanup result
-                if monitor.lastCleanedGB > 0 {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                        Text(String(format: "%.1f GB freed in the last cleanup", monitor.lastCleanedGB))
-                            .font(.subheadline)
-                            .foregroundColor(.green)
-                    }
-                    .padding(12)
-                    .background(Color.green.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                // Always on the page, never a dismissible sheet.
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(.secondary)
+                    Text("These folders are caches. Applications rebuild them as they go, so removing one costs disk activity and a slower first launch, not data. Some of them still hold things you may care about, and only you know which. Read the paths before you select. Items are moved to the Trash, so a wrong choice can be undone until you empty it.")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                
-                // Cache list
+                .padding(14)
+                .background(Color.secondary.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                if let report = monitor.lastReport {
+                    CleanupReportCard(report: report)
+                }
+
                 if monitor.caches.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 48))
                             .foregroundColor(.green)
-                        Text("No significant cache found")
+                        Text("No cache above 10 MB")
                             .font(.title3)
                             .fontWeight(.medium)
-                        Text("Your Mac is clean!")
-                            .foregroundColor(.secondary)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(40)
                 } else {
-                    StatCard(title: "Detected caches", icon: "archivebox", iconColor: .orange) {
+                    StatCard(title: "Caches", icon: "archivebox", iconColor: .orange) {
                         VStack(spacing: 0) {
-                            // Select all
                             HStack {
-                                Button(action: selectAll) {
-                                    Text("Select all (safe)")
-                                        .font(.caption)
-                                }
-                                .buttonStyle(.borderless)
-                                .foregroundColor(.blue)
-                                
-                                Button(action: deselectAll) {
-                                    Text("Deselect all")
-                                        .font(.caption)
-                                }
-                                .buttonStyle(.borderless)
-                                .foregroundColor(.secondary)
-                                
+                                Button("Select all") { setAllSelected(true) }
+                                    .buttonStyle(.borderless)
+                                    .foregroundColor(.blue)
+                                Button("Deselect all") { setAllSelected(false) }
+                                    .buttonStyle(.borderless)
+                                    .foregroundColor(.secondary)
                                 Spacer()
-                                
-                                Text("Total: \(formatMemoryGB(totalCacheGB()))")
+                                Text("\(monitor.caches.count) items, \(formatBytes(totalBytes)) total")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
                             .padding(.bottom, 12)
-                            
+
                             Divider()
-                            
-                            ForEach(monitor.caches.indices, id: \.self) { i in
-                                CacheRow(item: $monitor.caches[i])
+
+                            ForEach($monitor.caches) { $item in
+                                CacheRow(item: $item)
                                 Divider()
                             }
                         }
                     }
                 }
-                
-                // Action bar
-                if selectedCount > 0 {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("\(selectedCount) item\(selectedCount > 1 ? "s" : "") selected")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text(String(format: "%.1f GB to free", selectedGB))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
-                        
-                        Button {
-                            showingConfirmation = true
-                        } label: {
-                            if monitor.isCleaning {
-                                HStack(spacing: 6) {
-                                    ProgressView().controlSize(.small)
-                                    Text("Cleaning...")
-                                }
-                            } else {
-                                Label("Clean selection", systemImage: "trash")
+
+                if !selected.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if !selectedRunningApps.isEmpty {
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                Text("\(selectedRunningApps.joined(separator: ", ")) \(selectedRunningApps.count == 1 ? "is" : "are") running. Removing a cache underneath a running app can interrupt whatever it is doing - a build in progress, an install, an export. Quitting it first is safer.")
+                                    .font(.callout)
+                                    .foregroundColor(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(monitor.isCleaning)
-                        .tint(.red)
+
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(selected.count) item\(selected.count > 1 ? "s" : "") selected")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Text("\(formatBytes(selectedBytes)) to move to the Trash")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+
+                            Button("Preview") {
+                                monitor.cleanSelectedCaches(dryRun: true)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(monitor.isCleaning)
+                            .help("List what would be moved, without touching anything")
+
+                            Button {
+                                showingConfirmation = true
+                            } label: {
+                                if monitor.isCleaning {
+                                    HStack(spacing: 6) {
+                                        ProgressView().controlSize(.small)
+                                        Text("Working...")
+                                    }
+                                } else {
+                                    Label("Move to Trash", systemImage: "trash")
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(monitor.isCleaning)
+                        }
                     }
                     .padding(16)
                     .background(.background)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.red.opacity(0.2), lineWidth: 1))
-                }
-                
-                // Warning
-                HStack(spacing: 6) {
-                    Image(systemName: "info.circle")
-                        .foregroundColor(.secondary)
-                        .font(.caption)
-                    Text("Only caches marked as safe are shown. Sensitive system caches are excluded.")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.12), lineWidth: 1))
                 }
             }
             .padding(24)
         }
         .background(Color(NSColor.windowBackgroundColor))
-        .alert("Confirm cleanup", isPresented: $showingConfirmation) {
+        .alert("Move \(selected.count) item\(selected.count > 1 ? "s" : "") to the Trash?", isPresented: $showingConfirmation) {
             Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                monitor.cleanSelectedCaches()
-            }
+            Button("Move to Trash") { monitor.cleanSelectedCaches() }
         } message: {
-            Text("You are about to delete \(String(format: "%.1f GB", selectedGB)) of caches. Apps regenerate these files automatically.")
+            Text("\(formatBytes(selectedBytes)) will be moved to the Trash. Nothing is freed on disk until you empty it.")
         }
     }
-    
-    func selectAll() {
-        for i in monitor.caches.indices {
-            if monitor.caches[i].isSafe {
-                monitor.caches[i].isSelected = true
+
+    func setAllSelected(_ value: Bool) {
+        for i in monitor.caches.indices { monitor.caches[i].isSelected = value }
+    }
+}
+
+// MARK: - Report
+
+struct CleanupReportCard: View {
+    let report: CacheRemovalReport
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: report.wasDryRun ? "eye" : "checkmark.circle.fill")
+                    .foregroundColor(report.wasDryRun ? .blue : .green)
+                if report.wasDryRun {
+                    Text("Preview: \(report.outcomes.count) item\(report.outcomes.count > 1 ? "s" : "") would be moved to the Trash")
+                        .font(.subheadline)
+                } else {
+                    Text("\(formatBytes(report.movedBytes)) moved to the Trash. Empty the Trash to reclaim it on disk.")
+                        .font(.subheadline)
+                }
+                Spacer()
+            }
+
+            ForEach(report.outcomes) { outcome in
+                if let problem = describe(outcome) {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.red)
+                            .font(.caption)
+                        Text("\(outcome.name): \(problem)")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
         }
+        .padding(12)
+        .background((report.failures.isEmpty ? Color.green : Color.red).opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
-    
-    func deselectAll() {
-        for i in monitor.caches.indices {
-            monitor.caches[i].isSelected = false
+
+    /// Only failures produce a line; successes are already covered by the total.
+    private func describe(_ outcome: CacheRemovalOutcome) -> String? {
+        switch outcome.result {
+        case .movedToTrash, .wouldBeMovedToTrash: return nil
+        case .rejected(let reason): return "not removed, \(reason)"
+        case .failed(let reason): return "not removed, \(reason)"
         }
-    }
-    
-    func totalCacheGB() -> Double {
-        monitor.caches.reduce(0) { $0 + $1.sizeGB }
     }
 }
 
@@ -177,56 +211,49 @@ struct CleanerView: View {
 
 struct CacheRow: View {
     @Binding var item: CacheItem
-    
-    var sizeLabel: String {
-        if item.sizeGB >= 1 {
-            return String(format: "%.1f GB", item.sizeGB)
-        } else {
-            return String(format: "%.0f MB", item.sizeGB * 1024)
-        }
-    }
-    
+
     var body: some View {
         HStack(spacing: 12) {
-            Toggle("", isOn: $item.isSelected)
-                .toggleStyle(.checkbox)
-                .disabled(!item.isSafe)
-            
+            Toggle(isOn: $item.isSelected) {
+                Text("Select \(item.name)")
+            }
+            .toggleStyle(.checkbox)
+            .labelsHidden()
+            .accessibilityLabel("Select \(item.name), \(formatBytes(item.sizeBytes))")
+
             Image(systemName: item.icon)
-                .foregroundColor(item.isSafe ? .primary : .secondary)
+                .foregroundColor(.secondary)
                 .frame(width: 18)
-            
+
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.name)
-                    .font(.system(size: 13))
-                    .fontWeight(.medium)
+                HStack(spacing: 6) {
+                    Text(item.name)
+                        .font(.system(size: 13))
+                        .fontWeight(.medium)
+                    if let app = item.runningAppName {
+                        Text("\(app) is running")
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.15))
+                            .foregroundColor(.orange)
+                            .clipShape(Capsule())
+                    }
+                }
                 Text(item.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
             }
-            
+
             Spacer()
-            
-            if !item.isSafe {
-                Text("System")
-                    .font(.caption2)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.secondary.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                    .foregroundColor(.secondary)
-            }
-            
-            Text(sizeLabel)
+
+            Text(formatBytes(item.sizeBytes))
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundColor(item.sizeGB > 1 ? .orange : .primary)
-                .frame(width: 70, alignment: .trailing)
+                .foregroundColor(item.sizeBytes > 1_000_000_000 ? .orange : .primary)
+                .frame(width: 80, alignment: .trailing)
         }
         .padding(.vertical, 8)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if item.isSafe { item.isSelected.toggle() }
-        }
     }
 }

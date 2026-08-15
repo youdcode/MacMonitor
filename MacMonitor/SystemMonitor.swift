@@ -84,13 +84,19 @@ struct AppProcess: Identifiable {
 }
 
 struct CacheItem: Identifiable {
-    let id = UUID()
+    var id: String { path }
     var name: String
     var path: String
-    var sizeGB: Double
+    var sizeBytes: Int64
     var isSelected: Bool = false
-    var isSafe: Bool
     var icon: String
+    /// Bundle identifier of the owning app, when the directory name looks like one.
+    var bundleID: String?
+    /// Set when the owning application is running right now. The user cannot see
+    /// this from a directory listing; the app can, so it says so.
+    var runningAppName: String?
+
+    var sizeGB: Double { Double(sizeBytes) / 1_073_741_824 }
 }
 
 // MARK: - SystemMonitor
@@ -107,7 +113,7 @@ class SystemMonitor: ObservableObject {
     @Published var caches: [CacheItem] = []
     @Published var alerts: [Alert] = []
     @Published var isCleaning = false
-    @Published var lastCleanedGB: Double = 0
+    @Published var lastReport: CacheRemovalReport?
     @Published var uptime: String = ""
     @Published var macModel: String = "MacBook Pro"
     @Published var macOS: String = ""
@@ -471,69 +477,206 @@ class SystemMonitor: ObservableObject {
 
     // MARK: - Caches
 
-    func fetchCaches() async {
-        let home      = FileManager.default.homeDirectoryForCurrentUser.path
-        let cachePath = "\(home)/Library/Caches"
-
-        let knownCaches: [(name: String, path: String, safe: Bool, icon: String)] = [
-            ("Adobe",             "\(cachePath)/Adobe",                             true,  "paintbrush"),
-            ("Google Chrome",     "\(cachePath)/Google",                            true,  "globe"),
-            ("Homebrew",          "\(cachePath)/Homebrew",                          true,  "shippingbox"),
-            ("Telegram",          "\(cachePath)/ru.keepcoder.Telegram",             true,  "paperplane"),
-            ("Discord",           "\(cachePath)/com.hnc.Discord",                   true,  "bubble.left"),
-            ("Spotify",           "\(cachePath)/com.spotify.client",                true,  "music.note"),
-            ("Slack",             "\(cachePath)/com.tinyspeck.slackmacgap",         true,  "number"),
-            ("Music",             "\(cachePath)/com.apple.Music",                   true,  "music.quarternote.3"),
-            ("Xcode DerivedData", "\(home)/Library/Developer/Xcode/DerivedData",    true,  "hammer"),
-            ("npm",               "\(home)/.npm/_cacache",                          true,  "chevron.left.forwardslash.chevron.right"),
-            ("pip",               "\(cachePath)/pip",                               true,  "chevron.left.forwardslash.chevron.right"),
-            ("Loom",              "\(cachePath)/com.loom.desktop.ShipIt",           true,  "video"),
-            ("TradingView",       "\(cachePath)/tradingview-desktop-updater",       true,  "chart.line.uptrend.xyaxis"),
-            ("SiriTTS",           "\(cachePath)/SiriTTS",                           false, "waveform"),
-            ("iCloud Mail",       "\(cachePath)/icloudmailagent",                   false, "envelope"),
-        ]
-
-        var items: [CacheItem] = []
-        let fm = FileManager.default
-        for cache in knownCaches {
-            guard fm.fileExists(atPath: cache.path) else { continue }
-            let sizeBytes = directorySize(path: cache.path)
-            let sizeGB    = Double(sizeBytes) / 1_073_741_824
-            if sizeGB > 0.01 {
-                items.append(CacheItem(name: cache.name, path: cache.path,
-                                       sizeGB: sizeGB, isSafe: cache.safe, icon: cache.icon))
-            }
-        }
-        caches = items.sorted { $0.sizeGB > $1.sizeGB }
+    /// Directories the cleaner is allowed to touch, resolved.
+    ///
+    /// ~/Library/Caches is enumerated; the two development caches below live
+    /// elsewhere and are named explicitly because they are large, well understood,
+    /// and the ones most likely to be in use while the user is looking at them.
+    nonisolated static func cacheRoots() -> [String] {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return [
+            "\(home)/Library/Caches",
+            "\(home)/Library/Developer/Xcode/DerivedData",
+            "\(home)/.npm",
+        ].map { ($0 as NSString).resolvingSymlinksInPath }
     }
 
-    func directorySize(path: String) -> Int64 {
+    func fetchCaches() async {
+        let running = Self.runningApplicationsByBundleID()
+        let discovered = await Task.detached(priority: .utility) {
+            Self.discoverCaches(running: running)
+        }.value
+        caches = discovered
+    }
+
+    /// Bundle identifier -> localised app name, for applications running right now.
+    nonisolated static func runningApplicationsByBundleID() -> [String: String] {
+        var map: [String: String] = [:]
+        for app in NSWorkspace.shared.runningApplications {
+            guard let id = app.bundleIdentifier else { continue }
+            map[id] = app.localizedName ?? id
+        }
+        return map
+    }
+
+    /// Enumerates the cache roots. Runs off the main actor: this walks tens of
+    /// thousands of files and used to freeze the interface for seconds at launch.
+    nonisolated static func discoverCaches(running: [String: String]) -> [CacheItem] {
         let fm = FileManager.default
-        guard let enumerator = fm.enumerator(atPath: path) else { return 0 }
+        let home = fm.homeDirectoryForCurrentUser.path
+        var items: [CacheItem] = []
+
+        func add(path: String, directoryName: String) {
+            let described = CacheNaming.describe(directoryName: directoryName)
+            let bytes = directorySize(path: path)
+            guard bytes > 10_000_000 else { return }   // below 10 MB it is not worth a row
+
+            var runningName: String?
+            if let id = described.bundleID, let appName = running[id] { runningName = appName }
+
+            items.append(CacheItem(name: described.name,
+                                   path: path,
+                                   sizeBytes: bytes,
+                                   icon: described.icon,
+                                   bundleID: described.bundleID,
+                                   runningAppName: runningName))
+        }
+
+        // 1. Everything the user has under ~/Library/Caches, minus the exclusions.
+        let cachesRoot = "\(home)/Library/Caches"
+        if let entries = try? fm.contentsOfDirectory(atPath: cachesRoot) {
+            for entry in entries.sorted() {
+                guard !entry.hasPrefix("."), !CacheNaming.excluded.contains(entry) else { continue }
+                var isDirectory: ObjCBool = false
+                let full = (cachesRoot as NSString).appendingPathComponent(entry)
+                guard fm.fileExists(atPath: full, isDirectory: &isDirectory), isDirectory.boolValue else { continue }
+                add(path: full, directoryName: entry)
+            }
+        }
+
+        // 2. Two development caches that do not live under ~/Library/Caches.
+        let derivedData = "\(home)/Library/Developer/Xcode/DerivedData"
+        if fm.fileExists(atPath: derivedData) {
+            let bytes = directorySize(path: derivedData)
+            if bytes > 10_000_000 {
+                items.append(CacheItem(name: "Xcode DerivedData",
+                                       path: derivedData,
+                                       sizeBytes: bytes,
+                                       icon: "hammer",
+                                       bundleID: "com.apple.dt.Xcode",
+                                       runningAppName: running["com.apple.dt.Xcode"]))
+            }
+        }
+
+        let npmCache = "\(home)/.npm/_cacache"
+        if fm.fileExists(atPath: npmCache) {
+            let bytes = directorySize(path: npmCache)
+            if bytes > 10_000_000 {
+                items.append(CacheItem(name: "npm",
+                                       path: npmCache,
+                                       sizeBytes: bytes,
+                                       icon: "chevron.left.forwardslash.chevron.right",
+                                       bundleID: nil,
+                                       runningAppName: isProcessRunning(named: "node") ? "node" : nil))
+            }
+        }
+
+        return items.sorted { $0.sizeBytes > $1.sizeBytes }
+    }
+
+    /// Command-line tools have no bundle identifier, so NSWorkspace cannot see them.
+    nonisolated static func isProcessRunning(named name: String) -> Bool {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        task.arguments = ["-x", name]
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        do {
+            try task.run()
+            task.waitUntilExit()
+            return task.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+
+    nonisolated static func directorySize(path: String) -> Int64 {
+        let fm = FileManager.default
+        guard let enumerator = fm.enumerator(at: URL(fileURLWithPath: path),
+                                             includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey],
+                                             options: [.skipsHiddenFiles]) else { return 0 }
         var total: Int64 = 0
-        for case let file as String in enumerator {
-            let fp = (path as NSString).appendingPathComponent(file)
-            if let attrs = try? fm.attributesOfItem(atPath: fp),
-               let size  = attrs[.size] as? Int64 { total += size }
+        for case let url as URL in enumerator {
+            guard let values = try? url.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]),
+                  values.isRegularFile == true,
+                  let size = values.totalFileAllocatedSize else { continue }
+            total += Int64(size)
         }
         return total
     }
 
-    func cleanSelectedCaches() {
+    /// Moves the selected caches to the trash.
+    ///
+    /// Trash rather than delete: that is what the Finder does, and it makes a wrong
+    /// click recoverable without taking anything away from the user.
+    ///
+    /// - Parameter dryRun: when true nothing is touched and the report lists what
+    ///   would have been moved.
+    func cleanSelectedCaches(dryRun: Bool = false) {
+        let selected = caches.filter(\.isSelected)
+        guard !selected.isEmpty else { return }
+
         isCleaning = true
-        let toClean = caches.filter { $0.isSelected && $0.isSafe }
-        Task.detached {
-            var freed = 0.0
-            for item in toClean {
-                freed += item.sizeGB
-                try? FileManager.default.removeItem(atPath: item.path)
+        let roots = Self.cacheRoots()
+
+        Task { [weak self] in
+            let report = await Task.detached(priority: .utility) {
+                Self.remove(selected, allowedRoots: roots, dryRun: dryRun)
+            }.value
+
+            guard let self else { return }
+            self.lastReport = report
+            self.isCleaning = false
+            await self.fetchCaches()
+        }
+    }
+
+    /// - Returns: one outcome per item, so a failure is reported with its reason
+    ///   instead of being swallowed. The reclaimed figure is derived from the
+    ///   outcomes, never accumulated ahead of the work.
+    nonisolated static func remove(_ items: [CacheItem],
+                                   allowedRoots: [String],
+                                   dryRun: Bool) -> CacheRemovalReport {
+        let fm = FileManager.default
+        var outcomes: [CacheRemovalOutcome] = []
+
+        for item in items {
+            let resolved = (item.path as NSString).resolvingSymlinksInPath
+
+            // Re-validated here, immediately before acting, not when the list was
+            // built: the path may have been replaced by a symlink in between.
+            switch CachePathValidator.validate(candidate: item.path,
+                                               resolved: resolved,
+                                               allowedRoots: allowedRoots) {
+            case .failure(let rejection):
+                outcomes.append(CacheRemovalOutcome(path: item.path, name: item.name,
+                                                    sizeBytes: item.sizeBytes,
+                                                    result: .rejected(rejection.rawValue)))
+                continue
+            case .success:
+                break
             }
-            await MainActor.run {
-                self.lastCleanedGB = freed
-                self.isCleaning    = false
-                Task { await self.fetchCaches() }
+
+            if dryRun {
+                outcomes.append(CacheRemovalOutcome(path: item.path, name: item.name,
+                                                    sizeBytes: item.sizeBytes,
+                                                    result: .wouldBeMovedToTrash))
+                continue
+            }
+
+            do {
+                try fm.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: nil)
+                outcomes.append(CacheRemovalOutcome(path: item.path, name: item.name,
+                                                    sizeBytes: item.sizeBytes,
+                                                    result: .movedToTrash))
+            } catch {
+                outcomes.append(CacheRemovalOutcome(path: item.path, name: item.name,
+                                                    sizeBytes: item.sizeBytes,
+                                                    result: .failed(error.localizedDescription)))
             }
         }
+
+        return CacheRemovalReport(outcomes: outcomes, wasDryRun: dryRun)
     }
 
     // MARK: - Shell helper

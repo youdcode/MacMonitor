@@ -17,8 +17,10 @@
 		A008 /* ThermalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F009 /* ThermalView.swift */; };
 		A009 /* Metrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F010 /* Metrics.swift */; };
 		A010 /* LegacyShellParsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F011 /* LegacyShellParsers.swift */; };
+		A011 /* CacheCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F012 /* CacheCleaner.swift */; };
 		TA01 /* MetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF01 /* MetricsTests.swift */; };
 		TA02 /* LegacyShellParsersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF02 /* LegacyShellParsersTests.swift */; };
+		TA03 /* CachePathValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF03 /* CachePathValidatorTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,9 +45,11 @@
 		F009 /* ThermalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalView.swift; sourceTree = "<group>"; };
 		F010 /* Metrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metrics.swift; sourceTree = "<group>"; };
 		F011 /* LegacyShellParsers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyShellParsers.swift; sourceTree = "<group>"; };
+		F012 /* CacheCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheCleaner.swift; sourceTree = "<group>"; };
 		PROD /* MacMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MacMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		TF01 /* MetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricsTests.swift; sourceTree = "<group>"; };
 		TF02 /* LegacyShellParsersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyShellParsersTests.swift; sourceTree = "<group>"; };
+		TF03 /* CachePathValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachePathValidatorTests.swift; sourceTree = "<group>"; };
 		TPRD /* MacMonitorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MacMonitorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -90,6 +94,7 @@
 				F009 /* ThermalView.swift */,
 				F010 /* Metrics.swift */,
 				F011 /* LegacyShellParsers.swift */,
+				F012 /* CacheCleaner.swift */,
 			);
 			path = MacMonitor;
 			sourceTree = "<group>";
@@ -99,6 +104,7 @@
 			children = (
 				TF01 /* MetricsTests.swift */,
 				TF02 /* LegacyShellParsersTests.swift */,
+				TF03 /* CachePathValidatorTests.swift */,
 			);
 			path = MacMonitorTests;
 			sourceTree = "<group>";
@@ -228,6 +234,7 @@
 				A008 /* ThermalView.swift in Sources */,
 				A009 /* Metrics.swift in Sources */,
 				A010 /* LegacyShellParsers.swift in Sources */,
+				A011 /* CacheCleaner.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -237,6 +244,7 @@
 			files = (
 				TA01 /* MetricsTests.swift in Sources */,
 				TA02 /* LegacyShellParsersTests.swift in Sources */,
+				TA03 /* CachePathValidatorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
