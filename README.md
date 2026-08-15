@@ -23,9 +23,9 @@ Dark: [Overview](docs/images/overview-dark.png) ·
 </details>
 
 Every reading in those is live, from this machine, at the moment of the capture. The
-Network screen shows a real ndt7 run against `mlab1-par08` — 688 Mbit/s, 860 MB
-transferred — beside a current throughput of 1 kB/s, which is the pair of numbers this
-README spends a section on.
+Network screen shows a real ndt7 run against `mlab3-par05` — 521 Mbit/s down and 399
+up, 1.2 GB moved — beside a current throughput of 13 kB/s, which is the pair of numbers
+this README spends a section on.
 
 ## What it measures
 
@@ -46,7 +46,7 @@ Processes and Cleaner. Every figure comes from the API named beside it.
 | Storage | used / free / total | `FileManager.attributesOfFileSystem` |
 | Storage | read and write activity | `IOBlockStorageDriver` → `Statistics`, as a delta |
 | Network | current throughput, totals since boot | `net.link.generic.ifdata.<index>.general`, all interfaces except loopback |
-| Network | measured capacity | ndt7 against M-Lab, on demand only |
+| Network | measured capacity, both directions | ndt7 against M-Lab, on demand only |
 | Battery | charge, time remaining | `IOPSCopyPowerSourcesList` |
 | Battery | cycles, temperature, power, full-charge capacity | `AppleSmartBattery` in the IORegistry |
 | Overview | machine name | `product-name` from `IODeviceTree:/product` |
@@ -130,12 +130,71 @@ per second. **Capacity** is what the link carries when something deliberately fi
 it, which is what a speed test measures. They live in separate cards, and the app
 never computes one from the other.
 
-The capacity test runs ndt7 against M-Lab servers, only when you press the button. It
-states before you press it that it will download about 885 MB, and that M-Lab collects
-the IP address your provider gave you along with the result and publishes both. On the
-M-Lab discussion list: *"Both speed.measurementlab.net and Google's Internet Speed Test
-integrate NDT."*
+The capacity test runs ndt7 against M-Lab servers, in both directions, only when you
+press the button. On the M-Lab discussion list: *"Both speed.measurementlab.net and
+Google's Internet Speed Test integrate NDT."*
 ([source](https://groups.google.com/a/measurementlab.net/g/discuss/c/iR4zO_rT4KE))
+
+### What it costs, and why the app will not name one number
+
+The test fills the link for ten seconds in each direction. That means what it moves is
+not a property of the test at all — it is whatever your connection can carry. Ten
+seconds at 1 Mbit/s is 1.25 MB, and it scales from there.
+
+The screen states that rule and one measured example rather than a single figure. It
+used to say "about 885 MB", which was true of one machine on one evening and would be
+wrong by an order of magnitude on a slower line. Every complete run measured while
+building this:
+
+| rate | moved | rule predicts |
+|---:|---:|---:|
+| 226 Mbit/s up | 285 MB | 283 MB |
+| 254 Mbit/s up | 318 MB | 318 MB |
+| 263 Mbit/s up | 335 MB | 329 MB |
+| 312 Mbit/s down | 390 MB | 390 MB |
+| 316 Mbit/s down | 395 MB | 395 MB |
+| 350 Mbit/s down | 437 MB | 438 MB |
+| 399 Mbit/s up | 503 MB | 499 MB |
+| 521 Mbit/s down | 652 MB | 652 MB |
+| 674 Mbit/s down | 885 MB | 843 MB |
+| 688 Mbit/s down | 860 MB | 860 MB |
+
+Every row lands within two per cent except the 674 Mbit/s one, which ran for ten and a
+half seconds rather than ten and moved five per cent more for it.
+
+The interface counters were read either side of one of those runs as an independent
+reference: they saw 708 MB in and 529 MB out where the app counted 652 and 503, which
+is 8.7 % and 5.2 % more. That is packet headers and the acknowledgements each direction
+sends back — and it is also the check that the upload payloads are not being compressed
+away, which is why they are random rather than zeroed.
+
+### One test or two, against M-Lab's forty a day
+
+M-Lab documents "a rate limit of 40 tests per client per day" and says a client that
+hits it is answered with an HTTP 204 No Content. A 204 is an HTTP status, and the only
+HTTP request in the whole flow is the one for the server list. That request returns
+`wss://` URLs for both directions carrying the same access token — compared character
+by character, identical — and that one token was observed opening a download connection
+followed by four separate upload connections, all accepted.
+
+So a complete test in both directions costs one of the forty. What is *not* established:
+M-Lab nowhere writes the sentence "a bidirectional test counts as one". The conclusion
+above is drawn from where the refusal is returned and from the token being reusable.
+
+### The dial
+
+The capacity reading sits on a logarithmic dial, base ten, three decades, 1 Mbit/s to
+1000. Linear would be unreadable: over the same 270 degrees of travel, 5 Mbit/s would
+sit 1.4 degrees from the stop and 20 Mbit/s 5.4 degrees, so every connection from
+unusable to decent would occupy the first tenth of the dial while the top half waited
+for speeds most people do not have. Logarithmically those two are 63 and 117 degrees,
+which is the difference between reading a dial and squinting at it.
+
+A link outside the scale pins the needle rather than running off the dial, and the exact
+figure is printed in the middle either way. The top tick is labelled `1000+` for that
+reason. The five-level rating underneath describes the **download**: its boundaries were
+chosen for one, and calling an ordinary 25 Mbit/s upstream "slow" is a judgement nothing
+here has earned.
 
 ## The page size trap
 
@@ -157,7 +216,7 @@ field is declared 64-bit.
 
 ## Architecture
 
-Three layers, 3,756 lines of Swift across 19 files, plus 4 test files.
+Three layers, 4,204 lines of Swift across 19 files, plus 4 test files.
 
 **Collection** reads the kernel and the IORegistry. One shell command remains, `ps`,
 because a non-privileged process cannot read another user's CPU time:
@@ -167,8 +226,8 @@ it was tested. `/bin/ps` manages it by being setuid root (`-rwsr-xr-x 1 root whe
 The reasoning sits next to the call.
 
 **Calculation** is pure functions over plain values — page conversion, tick deltas,
-uptime formatting, health thresholds, speed tiers, transfer estimates. No I/O, no
-shared state. This is where the measurement bugs lived, and it is what the tests
+uptime formatting, health thresholds, speed tiers, the logarithmic dial scale, transfer
+estimates. No I/O, no shared state. This is where the measurement bugs lived, and it is what the tests
 cover.
 
 **Views** are SwiftUI, one file per screen, over a shared design system that holds
@@ -178,7 +237,7 @@ first commit, "the disk is filling up" meant 60 %, 80 %, 85 %, 90 %, "under 20 G
 
 ## Tests
 
-52 tests, on the calculation layer and the remaining parsers.
+64 tests, on the calculation layer and the remaining parsers.
 
 Each one is derived from the observed defect and the expected behaviour rather than
 from reading the fix — a test written by reading the implementation mostly proves the
