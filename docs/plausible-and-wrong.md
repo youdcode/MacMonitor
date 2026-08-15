@@ -362,3 +362,23 @@ newer than the deployment target as an error rather than a warning. So if this p
 builds, no API newer than macOS 13 is used without a guard — that half is genuinely
 enforced. Runtime behaviour on macOS 13 is a separate question, and it has not been
 tested.
+
+## The original and the copy
+
+One rule came out of writing all this down, and it is not about measurement.
+
+The comment on a declaration is the original. A paragraph in a README that says the
+same thing is a copy. The copy cannot be compiled, cannot be tested, and nothing warns
+when the two stop agreeing — so the code moves, and the copy goes on asserting what
+used to be true, in the file most likely to be read and least likely to be checked. It
+fails in the shape everything above fails in: quietly, plausibly, with nothing raised.
+
+So when something has to be said once, it is said on the declaration, and the README
+points at it by name. When it had already been said in both places, the copy went and
+the original stayed. Two arguments left the README that way — what one bidirectional
+speed test costs against M-Lab's forty a day, on `SpeedTestFacts.dailyTestLimit`, and
+why the capacity dial is logarithmic, on `GaugeScale` — and neither had to be rewritten
+to move, because in both cases the original was already the fuller of the two.
+
+It generalises past this repository. Anything a README asserts that the code also
+asserts is a second copy of a fact, kept in the one place no tool will ever check.
