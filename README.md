@@ -1,5 +1,10 @@
 # MacMonitor
 
+[![Build](https://github.com/youdcode/MacMonitor/actions/workflows/build.yml/badge.svg)](https://github.com/youdcode/MacMonitor/actions/workflows/build.yml)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
+![macOS 13.0 or later](https://img.shields.io/badge/macOS-13.0%2B-lightgrey)
+![Swift 5.0](https://img.shields.io/badge/Swift-5.0-orange)
+
 A macOS system monitor, written to find out what was actually wrong with my own Mac
 and then finished properly.
 
