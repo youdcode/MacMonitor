@@ -59,14 +59,14 @@ struct OverviewView: View {
                         color: .statusColor(for: monitor.ram.pressure),
                         size: 90,
                         label: "Memory",
-                        sublabel: "\(formatGB(monitor.ram.usedGB)) / \(formatGB(monitor.ram.totalGB))"
+                        sublabel: "\(formatMemoryGB(monitor.ram.usedGB)) / \(formatMemoryGB(monitor.ram.totalGB))"
                     )
                     RingGauge(
                         value: monitor.disk.usedPercent,
                         color: .statusColor(for: monitor.disk.usedPercent),
                         size: 90,
                         label: "Storage",
-                        sublabel: "\(formatGB(monitor.disk.usedGB)) / \(formatGB(monitor.disk.totalGB))"
+                        sublabel: "\(formatStorageGB(monitor.disk.usedGB)) / \(formatStorageGB(monitor.disk.totalGB))"
                     )
                     if monitor.battery.isPresent {
                         RingGauge(
@@ -97,19 +97,18 @@ struct OverviewView: View {
                     // Memory card
                     StatCard(title: "Memory", icon: "memorychip", iconColor: .purple) {
                         Sparkline(data: monitor.ram.history.map { $0 }, color: .purple)
-                        MetricRow(label: "Used", value: formatGB(monitor.ram.usedGB))
-                        MetricRow(label: "Free", value: formatGB(monitor.ram.freeGB))
-                        MetricRow(label: "Swap", value: formatGB(monitor.ram.swapUsedGB),
+                        MetricRow(label: "Used", value: formatMemoryGB(monitor.ram.usedGB))
+                        MetricRow(label: "Free", value: formatMemoryGB(monitor.ram.freeGB))
+                        MetricRow(label: "Swap", value: formatMemoryGB(monitor.ram.swapUsedGB),
                                   color: monitor.ram.swapUsedGB > 0.5 ? .orange : .secondary)
                     }
                     
                     // Storage card
                     StatCard(title: "Storage", icon: "internaldrive", iconColor: .teal) {
                         ProgressBar(value: monitor.disk.usedPercent, color: .statusColor(for: monitor.disk.usedPercent))
-                        MetricRow(label: "Used", value: formatGB(monitor.disk.usedGB))
-                        MetricRow(label: "Free", value: formatGB(monitor.disk.freeGB),
+                        MetricRow(label: "Used", value: formatStorageGB(monitor.disk.usedGB))
+                        MetricRow(label: "Free", value: formatStorageGB(monitor.disk.freeGB),
                                   color: monitor.disk.freeGB < 20 ? .orange : .green)
-                        MetricRow(label: "S.M.A.R.T.", value: monitor.disk.smartStatus, color: .green)
                     }
                     
                     // Battery card

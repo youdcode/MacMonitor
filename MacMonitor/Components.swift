@@ -267,9 +267,18 @@ extension Color {
     }
 }
 
-// MARK: - GB formatter
+// MARK: - Size formatters
 
-func formatGB(_ gb: Double) -> String {
-    if gb < 0.1 { return "\(Int(gb * 1024))MB" }
+/// Formats a value already expressed in BINARY gigabytes (2^30). Use for memory,
+/// which is what the hardware and the kernel report.
+func formatMemoryGB(_ gb: Double) -> String {
+    if gb < 0.1 { return "\(Int(gb * 1024)) MB" }
+    return String(format: "%.1f GB", gb)
+}
+
+/// Formats a value already expressed in DECIMAL gigabytes (10^9). Use for storage,
+/// which is how Finder and System Settings count it.
+func formatStorageGB(_ gb: Double) -> String {
+    if gb < 0.1 { return "\(Int(gb * 1000)) MB" }
     return String(format: "%.1f GB", gb)
 }

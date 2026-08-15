@@ -81,7 +81,7 @@ struct ThermalView: View {
 
                         // Visual level bar
                         VStack(alignment: .leading, spacing: 4) {
-                            ProgressBar(value: monitor.thermal.cpuTemp / 100.0, color: levelColor, height: 10)
+                            ProgressBar(value: monitor.thermal.thermalLevelValue / 100.0, color: levelColor, height: 10)
                             HStack {
                                 Text("Normal")
                                     .font(.caption2)

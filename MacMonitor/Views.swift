@@ -48,20 +48,20 @@ struct CPURAMView: View {
                         
                         HStack(spacing: 24) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(formatGB(monitor.ram.usedGB))
+                                Text(formatMemoryGB(monitor.ram.usedGB))
                                     .font(.system(size: 36, weight: .bold, design: .rounded))
                                     .foregroundColor(.purple)
-                                Text("of \(formatGB(monitor.ram.totalGB)) used")
+                                Text("of \(formatMemoryGB(monitor.ram.totalGB)) used")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
                             Spacer()
                             VStack(alignment: .leading, spacing: 8) {
-                                MetricRow(label: "Active", value: formatGB(monitor.ram.activeGB))
-                                MetricRow(label: "Inactive", value: formatGB(monitor.ram.inactiveGB))
-                                MetricRow(label: "Wired", value: formatGB(monitor.ram.wiredGB))
-                                MetricRow(label: "Compressed", value: formatGB(monitor.ram.compressedGB))
-                                MetricRow(label: "Free", value: formatGB(monitor.ram.freeGB), color: .green)
+                                MetricRow(label: "Active", value: formatMemoryGB(monitor.ram.activeGB))
+                                MetricRow(label: "Inactive", value: formatMemoryGB(monitor.ram.inactiveGB))
+                                MetricRow(label: "Wired", value: formatMemoryGB(monitor.ram.wiredGB))
+                                MetricRow(label: "Compressed", value: formatMemoryGB(monitor.ram.compressedGB))
+                                MetricRow(label: "Free", value: formatMemoryGB(monitor.ram.freeGB), color: .green)
                             }
                             .frame(width: 200)
                         }
@@ -82,11 +82,11 @@ struct CPURAMView: View {
                             }
                             Spacer()
                             VStack(alignment: .trailing, spacing: 2) {
-                                Text(formatGB(monitor.ram.swapUsedGB))
+                                Text(formatMemoryGB(monitor.ram.swapUsedGB))
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
                                     .foregroundColor(monitor.ram.swapUsedGB > 0.5 ? .orange : .green)
-                                Text("/ \(formatGB(monitor.ram.swapTotalGB))")
+                                Text("/ \(formatMemoryGB(monitor.ram.swapTotalGB))")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             }
@@ -127,20 +127,19 @@ struct DiskView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 24) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(formatGB(monitor.disk.freeGB))
+                                Text(formatStorageGB(monitor.disk.freeGB))
                                     .font(.system(size: 36, weight: .bold, design: .rounded))
                                     .foregroundColor(.teal)
-                                Text("available of \(formatGB(monitor.disk.totalGB))")
+                                Text("available of \(formatStorageGB(monitor.disk.totalGB))")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
                             Spacer()
                             VStack(alignment: .leading, spacing: 8) {
-                                MetricRow(label: "Used", value: formatGB(monitor.disk.usedGB))
-                                MetricRow(label: "Free", value: formatGB(monitor.disk.freeGB),
+                                MetricRow(label: "Used", value: formatStorageGB(monitor.disk.usedGB))
+                                MetricRow(label: "Free", value: formatStorageGB(monitor.disk.freeGB),
                                           color: monitor.disk.freeGB < 20 ? .orange : .green)
-                                MetricRow(label: "Total", value: formatGB(monitor.disk.totalGB))
-                                MetricRow(label: "S.M.A.R.T.", value: monitor.disk.smartStatus, color: .green)
+                                MetricRow(label: "Total", value: formatStorageGB(monitor.disk.totalGB))
                             }
                             .frame(width: 200)
                         }
@@ -307,7 +306,7 @@ struct ProcessesView: View {
                         HStack {
                             Text("Processes").font(.caption).fontWeight(.semibold).foregroundColor(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                             Text("CPU").font(.caption).fontWeight(.semibold).foregroundColor(.secondary).frame(width: 60, alignment: .trailing)
-                            Text("Memory").font(.caption).fontWeight(.semibold).foregroundColor(.secondary).frame(width: 80, alignment: .trailing)
+                            Text("RSS").font(.caption).fontWeight(.semibold).foregroundColor(.secondary).frame(width: 80, alignment: .trailing)
                             Text("PID").font(.caption).fontWeight(.semibold).foregroundColor(.secondary).frame(width: 50, alignment: .trailing)
                         }
                         .padding(.bottom, 8)

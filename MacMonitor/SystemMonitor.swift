@@ -36,7 +36,6 @@ struct DiskUsage {
     var usedGB: Double
     var freeGB: Double
     var usedPercent: Double { totalGB > 0 ? usedGB / totalGB : 0 }
-    var smartStatus: String
 }
 
 struct BatteryInfo {
@@ -51,12 +50,13 @@ struct BatteryInfo {
 }
 
 struct ThermalInfo {
-    var cpuTemp: Double      // level 0-100
+    /// ProcessInfo.thermalState encoded on a 0-100 scale so the sparkline can plot it.
+    /// This is NOT a temperature: macOS exposes no CPU or GPU temperature to
+    /// third-party apps on Apple Silicon.
+    var thermalLevelValue: Double
     var gpuTemp: Double
     var batteryTemp: Double
     var nandTemp: Double
-    var fanRPM: Int
-    var fanMax: Int
     var thermalLevel: String       // Nominal / Fair / Serious / Critical
     var thermalDescription: String // Explanatory text
     var history: [Double] = []
@@ -100,9 +100,9 @@ class SystemMonitor: ObservableObject {
 
     @Published var cpu     = CPUUsage(user: 0, system: 0, idle: 100, history: Array(repeating: 0, count: 60), longHistory: Array(repeating: 0, count: 1800))
     @Published var ram     = RAMUsage(totalGB: 0, usedGB: 0, freeGB: 0, activeGB: 0, inactiveGB: 0, wiredGB: 0, compressedGB: 0, swapUsedGB: 0, swapTotalGB: 0, history: Array(repeating: 0, count: 60), longHistory: Array(repeating: 0, count: 1800))
-    @Published var disk    = DiskUsage(totalGB: 0, usedGB: 0, freeGB: 0, smartStatus: "Verified")
+    @Published var disk    = DiskUsage(totalGB: 0, usedGB: 0, freeGB: 0)
     @Published var battery = BatteryInfo(isPresent: false, percentage: 0, isCharging: false, isPlugged: false, cycleCount: 0, health: "Normal", timeRemaining: "--", temperature: 0)
-    @Published var thermal = ThermalInfo(cpuTemp: 0, gpuTemp: 0, batteryTemp: 0, nandTemp: 0, fanRPM: 0, fanMax: 100, thermalLevel: "Nominal", thermalDescription: "Loading...", history: Array(repeating: 0, count: 60))
+    @Published var thermal = ThermalInfo(thermalLevelValue: 0, gpuTemp: 0, batteryTemp: 0, nandTemp: 0, thermalLevel: "Nominal", thermalDescription: "Loading...", history: Array(repeating: 0, count: 60))
     @Published var processes: [AppProcess] = []
     @Published var caches: [CacheItem] = []
     @Published var alerts: [Alert] = []
@@ -174,6 +174,7 @@ class SystemMonitor: ObservableObject {
     // MARK: - CPU (host_cpu_load_info delta)
 
     private var lastCPUTicks: (user: UInt32, sys: UInt32, idle: UInt32, nice: UInt32) = (0, 0, 0, 0)
+    private var hasCPUBaseline = false
 
     func fetchCPU() async {
         var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info>.stride / MemoryLayout<integer_t>.stride)
@@ -199,6 +200,14 @@ class SystemMonitor: ObservableObject {
         let total = dUser + dSys + dIdle + dNice
 
         lastCPUTicks = (curUser, curSys, curIdle, curNice)
+
+        // The first call has no previous sample, so the delta would be the tick
+        // counts since boot: an average since startup, not an instant reading.
+        // Seed the baseline and publish nothing.
+        guard hasCPUBaseline else {
+            hasCPUBaseline = true
+            return
+        }
 
         guard total > 0 else { return }
 
@@ -242,7 +251,7 @@ class SystemMonitor: ObservableObject {
             else if key == "Pages active"                { active     = val * gb }
             else if key == "Pages inactive"              { inactive   = val * gb }
             else if key == "Pages wired down"            { wired      = val * gb }
-            else if key.contains("compressor")           { compressed = val * gb }
+            else if key == "Pages occupied by compressor" { compressed = val * gb }
         }
 
         // Real used memory = active + wired + compressed (inactive is reclaimable)
@@ -279,9 +288,12 @@ class SystemMonitor: ObservableObject {
         guard let attrs = try? FileManager.default.attributesOfFileSystem(forPath: "/"),
               let total = attrs[.systemSize]     as? Int64,
               let free  = attrs[.systemFreeSize] as? Int64 else { return }
-        let totalGB = Double(total) / 1_073_741_824
-        let freeGB  = Double(free)  / 1_073_741_824
-        disk = DiskUsage(totalGB: totalGB, usedGB: totalGB - freeGB, freeGB: freeGB, smartStatus: "Verified")
+        // Storage is counted in decimal gigabytes (10^9), which is what Finder and
+        // System Settings show. Memory keeps binary gigabytes (2^30). Dividing both
+        // by 2^30 and labelling the result "GB" under-reported the disk by 7.4%.
+        let totalGB = Double(total) / 1_000_000_000
+        let freeGB  = Double(free)  / 1_000_000_000
+        disk = DiskUsage(totalGB: totalGB, usedGB: totalGB - freeGB, freeGB: freeGB)
     }
 
     // MARK: - Battery
@@ -350,12 +362,10 @@ class SystemMonitor: ObservableObject {
         if history.count > 60 { history.removeFirst() }
 
         thermal = ThermalInfo(
-            cpuTemp: numericVal,
+            thermalLevelValue: numericVal,
             gpuTemp: 0,
             batteryTemp: 0,
             nandTemp: 0,
-            fanRPM: thermal.fanRPM,
-            fanMax: 100,
             thermalLevel: level,
             thermalDescription: description,
             history: history
@@ -379,10 +389,21 @@ class SystemMonitor: ObservableObject {
 
     // MARK: - Processes
 
+    /// Physical memory in binary gigabytes, read once from the kernel.
+    private lazy var physicalMemoryGB: Double = {
+        var bytes: UInt64 = 0
+        var size = MemoryLayout<UInt64>.size
+        guard sysctlbyname("hw.memsize", &bytes, &size, nil, 0) == 0 else { return 0 }
+        return Double(bytes) / 1_073_741_824
+    }()
+
     func fetchProcesses() async {
         let result = await runShell("ps aux | sort -rk3 | head -15")
         var procs: [AppProcess] = []
-        for line in result.components(separatedBy: "\n").dropFirst() {
+        // No dropFirst here: `sort` mixes the ps header in with the rows, so it is
+        // not on the first line. Dropping line 1 removed the top CPU consumer.
+        // The header is discarded by the guard below, which cannot parse it.
+        for line in result.components(separatedBy: "\n") {
             let parts = line.split(separator: " ", maxSplits: 10, omittingEmptySubsequences: true)
             guard parts.count >= 11 else { continue }
             let pid    = Int32(parts[1]) ?? 0
@@ -390,7 +411,12 @@ class SystemMonitor: ObservableObject {
             let memPct = Double(parts[3]) ?? 0
             let name   = String(parts[10]).components(separatedBy: "/").last ?? String(parts[10])
             guard cpuVal > 0 || memPct > 1 else { continue }
-            let memMB  = memPct / 100.0 * ram.totalGB * 1024
+            // Read hw.memsize directly instead of depending on ram.totalGB, which is
+            // written by fetchRAM in the same TaskGroup with no ordering guarantee and
+            // is still 0 on the first cycle.
+            // transitional: this is RSS, not phys_footprint. Replaced when the process
+            // list moves off `ps` to a native API.
+            let memMB  = memPct / 100.0 * physicalMemoryGB * 1024
             procs.append(AppProcess(id: pid, name: name, cpuPercent: cpuVal, memoryMB: memMB, pid: pid))
         }
         processes = Array(procs.prefix(12))
@@ -399,10 +425,35 @@ class SystemMonitor: ObservableObject {
     // MARK: - Uptime
 
     func fetchUptime() async {
-        let result = await runShell("uptime")
-        if let r = result.range(of: "up ") {
-            let after = String(result[r.upperBound...])
-            uptime = after.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? ""
+        // Do NOT use ProcessInfo.systemUptime here: it is backed by mach_absolute_time
+        // and only counts time the machine was AWAKE. Measured on this machine, it read
+        // 10h39 against a real uptime of 15h44 - the 5h04 difference being sleep.
+        // kern.boottime is wall-clock and matches the `uptime` command.
+        var bootTime = timeval()
+        var size = MemoryLayout<timeval>.size
+        var mib: [Int32] = [CTL_KERN, KERN_BOOTTIME]
+
+        guard sysctl(&mib, 2, &bootTime, &size, nil, 0) == 0, bootTime.tv_sec > 0 else {
+            uptime = "--"
+            return
+        }
+
+        let seconds = Int(Date().timeIntervalSince1970) - bootTime.tv_sec
+        guard seconds > 0 else {
+            uptime = "--"
+            return
+        }
+
+        let days = seconds / 86_400
+        let hours = (seconds % 86_400) / 3_600
+        let minutes = (seconds % 3_600) / 60
+
+        if days > 0 {
+            uptime = "\(days)d \(hours)h \(minutes)m"
+        } else if hours > 0 {
+            uptime = "\(hours)h \(minutes)m"
+        } else {
+            uptime = "\(minutes)m"
         }
     }
 
@@ -420,14 +471,12 @@ class SystemMonitor: ObservableObject {
         if disk.freeGB < 10 {
             newAlerts.append(Alert(message: "Storage almost full - \(String(format: "%.1f", disk.freeGB)) GB left", level: .critical, timestamp: Date(), icon: "internaldrive"))
         }
-        if thermal.cpuTemp > 90 {
-            newAlerts.append(Alert(message: "Critical CPU temperature: \(Int(thermal.cpuTemp))°C", level: .critical, timestamp: Date(), icon: "thermometer.high"))
-        }
-        if thermal.cpuTemp > 70 && thermal.cpuTemp <= 90 {
-            newAlerts.append(Alert(message: "High CPU temperature: \(Int(thermal.cpuTemp))°C", level: .warning, timestamp: Date(), icon: "thermometer.medium"))
-        }
-        if thermal.fanRPM > 4500 {
-            newAlerts.append(Alert(message: "Fan at \(thermal.fanRPM) RPM - heavy load", level: .warning, timestamp: Date(), icon: "wind"))
+        // The app has no access to actual temperatures, so alerts report the
+        // thermal state macOS publishes, never a number of degrees.
+        if thermal.thermalLevel == "Critical" {
+            newAlerts.append(Alert(message: "Thermal state critical - close some apps immediately", level: .critical, timestamp: Date(), icon: "thermometer.high"))
+        } else if thermal.thermalLevel == "Serious" {
+            newAlerts.append(Alert(message: "Thermal state serious - macOS is reducing performance", level: .warning, timestamp: Date(), icon: "thermometer.medium"))
         }
         if battery.isPresent && battery.percentage < 15 && !battery.isPlugged {
             newAlerts.append(Alert(message: "Low battery: \(battery.percentage)%", level: .critical, timestamp: Date(), icon: "battery.25"))

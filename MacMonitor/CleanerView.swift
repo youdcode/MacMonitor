@@ -79,7 +79,7 @@ struct CleanerView: View {
                                 
                                 Spacer()
                                 
-                                Text("Total: \(formatGB(totalCacheGB()))")
+                                Text("Total: \(formatMemoryGB(totalCacheGB()))")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
