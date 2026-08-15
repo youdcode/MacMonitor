@@ -268,6 +268,12 @@ The first attempt at that mutation proved nothing either — it modelled the bug
 `Dictionary`, whose order is undefined, where the original was an ordered loop in which
 the last match wins. It had to be replayed faithfully before it detected anything.
 
+Running them prints two linker warnings, and they are expected. The XCTest that ships
+with Xcode 26.6 is built for macOS 14 — `otool -l` on it reads `minos 14.0` — while the
+test bundle is declared for macOS 13 like everything else here, because 13 is what the
+test code needs. Declaring 14 would silence the warnings by stating a property of one
+toolchain as a property of this repository.
+
 ## Building
 
 Built with Xcode 26.6. Deployment target macOS 13. Clone and build; there is nothing to
