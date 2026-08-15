@@ -236,8 +236,8 @@ The reasoning sits next to the call.
 
 **Calculation** is pure functions over plain values — page conversion, tick deltas,
 uptime formatting, health thresholds, speed tiers, the logarithmic dial scale, transfer
-estimates. No I/O, no shared state. This is where the measurement bugs lived, and it is what the tests
-cover.
+estimates. No I/O, no shared state. This is where the measurement bugs lived, and it is
+what the tests cover.
 
 **Views** are SwiftUI, one file per screen, over a shared design system that holds
 every threshold, colour and number format in one place. Those had drifted: in the
@@ -297,6 +297,24 @@ checked by running them and looking at `git status`.
   instantaneous reading.
 - English only. There is no localisation.
 - No UI tests. The interface is checked by hand.
+
+## Contributing
+
+Issues and pull requests are welcome, under the one rule the rest of this project runs
+on: anything said about a number needs a way to reproduce it. A command and its output
+is enough. "It should be about X" is not, and neither is a screenshot on its own.
+
+Most useful here: a defect with a reproduction, a measurement that contradicts
+something written above, or a reading from hardware or a version of macOS this has
+never run on. Everything in this README was measured on one Mac, which is a thin
+sample, and the second data point is worth more than the first.
+
+Least likely to fit: anything that needs a private framework or an entitlement,
+anything that makes the application measure on its own rather than when it is asked to,
+and any figure nothing outside the app can check. Those are not oversights — [what was
+deliberately left out](#what-was-deliberately-left-out) gives the reason for each.
+
+This is one person's side project. It will be read when it is read.
 
 ## Licence
 
