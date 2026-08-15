@@ -151,7 +151,7 @@ final class MetricsTests: XCTestCase {
     /// silently collapse back into a single formatter.
     func testMemoryUsesBinaryGigabytesAndStorageUsesDecimalGigabytes() {
         // 24 GiB of RAM, the machine the audit ran on
-        XCTAssertEqual(formatMemoryGB(24.0), "24.0 GB")
+        XCTAssertEqual(Format.memory(24.0), "24.0 GB")
 
         // The same physical disk, expressed both ways
         let diskBytes = 494_384_795_648.0
@@ -166,8 +166,8 @@ final class MetricsTests: XCTestCase {
     /// Below the gigabyte threshold each formatter must use its own multiplier:
     /// 1024 for memory, 1000 for storage.
     func testSubGigabyteValuesUseTheRightMultiplierForEachUnit() {
-        XCTAssertEqual(formatMemoryGB(0.05), "51 MB")   // 0.05 * 1024 = 51.2
-        XCTAssertEqual(formatStorageGB(0.05), "50 MB")  // 0.05 * 1000 = 50.0
+        XCTAssertEqual(Format.memory(0.05), "51 MB")   // 0.05 * 1024 = 51.2
+        XCTAssertEqual(Format.storage(0.05), "50 MB")  // 0.05 * 1000 = 50.0
     }
 
     // MARK: - The altitude at which the bug was felt

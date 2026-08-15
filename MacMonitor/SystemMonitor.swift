@@ -134,6 +134,8 @@ class SystemMonitor: ObservableObject {
     @Published var clusterLoad = NativeCPU.ClusterLoad(performance: nil, efficiency: nil)
     @Published var diskIORate: (readBytesPerSecond: Double, writeBytesPerSecond: Double)?
     @Published var networkRate: (inBytesPerSecond: Double, outBytesPerSecond: Double)?
+    @Published var networkTotals: NetworkCounters?
+    @Published var networkHistory: [Double] = []
 
     /// Holds the timers somewhere a nonisolated deinit can reach them.
     final class TimerBox: @unchecked Sendable {
@@ -197,18 +199,28 @@ class SystemMonitor: ObservableObject {
         timerBox.invalidateAll()
     }
 
+    /// The permanent set, plus whatever the visible screen adds.
     private func refreshAll() async {
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.fetchCPU() }
-            group.addTask { await self.fetchRAM() }
-            group.addTask { await self.fetchDisk() }
-            group.addTask { await self.fetchBattery() }
-            group.addTask { await self.fetchProcesses() }
-            group.addTask { await self.fetchUptime() }
-            group.addTask { await self.fetchNewMetrics() }
-        }
+        await fetchCPU()
+        await fetchRAM()
+        await fetchDisk()
+        await fetchBattery()
+        await fetchProcesses()
+        await fetchUptime()
+        await fetchAllDetail()
         checkAlerts()
     }
+
+    /// Every detail metric, every cycle. Narrowed to the visible screen in the next
+    /// commit; kept whole here so this one is a pure interface change.
+    private func fetchAllDetail() async {
+        gpu = NativeGPU.sample()
+        batteryDetail = NativeBattery.detail()
+        updateClusterLoad()
+        updateDiskIORate()
+        updateNetworkRate()
+    }
+
 
     // MARK: - Static Info
 
@@ -449,44 +461,42 @@ class SystemMonitor: ObservableObject {
     private var lastDiskIO: (counters: DiskIOCounters, at: Date)?
     private var lastNetwork: (counters: NetworkCounters, at: Date)?
 
-    func fetchNewMetrics() async {
-        gpu = NativeGPU.sample()
-        batteryDetail = NativeBattery.detail()
-
-        // P/E clusters. The mapping is read once: it cannot change at runtime.
+    func updateClusterLoad() {
         if clusterTypesCache == nil { clusterTypesCache = NativeCPU.clusterTypes() }
-        if let types = clusterTypesCache, !types.isEmpty, let current = NativeCPU.perCoreTicks() {
-            clusterLoad = NativeCPU.clusterLoad(current: current, previous: lastPerCoreTicks, types: types)
-            lastPerCoreTicks = current
-        }
+        guard let types = clusterTypesCache, !types.isEmpty, let current = NativeCPU.perCoreTicks() else { return }
+        clusterLoad = NativeCPU.clusterLoad(current: current, previous: lastPerCoreTicks, types: types)
+        lastPerCoreTicks = current
+    }
 
+    func updateDiskIORate() {
+        guard let counters = NativeDiskIO.counters() else { return }
         let now = Date()
+        defer { if lastDiskIO == nil { lastDiskIO = (counters, now) } }
+        guard let previous = lastDiskIO else { return }
+        let seconds = now.timeIntervalSince(previous.at)
+        guard seconds > 0.5 else { return }
+        diskIORate = (Double(counters.bytesRead &- previous.counters.bytesRead) / seconds,
+                      Double(counters.bytesWritten &- previous.counters.bytesWritten) / seconds)
+        lastDiskIO = (counters, now)
+    }
 
-        if let counters = NativeDiskIO.counters() {
-            if let previous = lastDiskIO {
-                let seconds = now.timeIntervalSince(previous.at)
-                if seconds > 0.5 {
-                    diskIORate = (Double(counters.bytesRead &- previous.counters.bytesRead) / seconds,
-                                  Double(counters.bytesWritten &- previous.counters.bytesWritten) / seconds)
-                    lastDiskIO = (counters, now)
-                }
-            } else {
-                lastDiskIO = (counters, now)
-            }
+    func updateNetworkRate() {
+        guard let counters = NativeNetwork.counters() else { return }
+        networkTotals = counters
+        let now = Date()
+        guard let previous = lastNetwork else {
+            lastNetwork = (counters, now)
+            return
         }
+        let seconds = now.timeIntervalSince(previous.at)
+        guard seconds > 0.5 else { return }
+        let down = Double(counters.bytesIn &- previous.counters.bytesIn) / seconds
+        let up = Double(counters.bytesWritten &- previous.counters.bytesWritten) / seconds
+        networkRate = (down, up)
+        lastNetwork = (counters, now)
 
-        if let counters = NativeNetwork.counters() {
-            if let previous = lastNetwork {
-                let seconds = now.timeIntervalSince(previous.at)
-                if seconds > 0.5 {
-                    networkRate = (Double(counters.bytesIn &- previous.counters.bytesIn) / seconds,
-                                   Double(counters.bytesWritten &- previous.counters.bytesWritten) / seconds)
-                    lastNetwork = (counters, now)
-                }
-            } else {
-                lastNetwork = (counters, now)
-            }
-        }
+        networkHistory.append(down + up)
+        if networkHistory.count > 60 { networkHistory.removeFirst() }
     }
 
     // MARK: - Uptime

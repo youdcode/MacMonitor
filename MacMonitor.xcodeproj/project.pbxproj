@@ -12,9 +12,7 @@
 		A003 /* SystemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F003 /* SystemMonitor.swift */; };
 		A004 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = F004 /* Components.swift */; };
 		A005 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F005 /* OverviewView.swift */; };
-		A006 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = F006 /* Views.swift */; };
 		A007 /* CleanerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F007 /* CleanerView.swift */; };
-		A008 /* ThermalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F009 /* ThermalView.swift */; };
 		A009 /* Metrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F010 /* Metrics.swift */; };
 		A010 /* LegacyShellParsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F011 /* LegacyShellParsers.swift */; };
 		A011 /* CacheCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F012 /* CacheCleaner.swift */; };
@@ -22,6 +20,14 @@
 		TA01 /* MetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF01 /* MetricsTests.swift */; };
 		TA02 /* LegacyShellParsersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF02 /* LegacyShellParsersTests.swift */; };
 		TA03 /* CachePathValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF03 /* CachePathValidatorTests.swift */; };
+		A020 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F020 /* DesignSystem.swift */; };
+		A021 /* DetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = F021 /* DetailScreen.swift */; };
+		A022 /* ProcessorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F022 /* ProcessorView.swift */; };
+		A023 /* MemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F023 /* MemoryView.swift */; };
+		A024 /* StorageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F024 /* StorageView.swift */; };
+		A025 /* NetworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F025 /* NetworkView.swift */; };
+		A026 /* BatteryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F026 /* BatteryView.swift */; };
+		A027 /* ProcessesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F027 /* ProcessesView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -40,10 +46,8 @@
 		F003 /* SystemMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMonitor.swift; sourceTree = "<group>"; };
 		F004 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		F005 /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
-		F006 /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views.swift; sourceTree = "<group>"; };
 		F007 /* CleanerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanerView.swift; sourceTree = "<group>"; };
 		F008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		F009 /* ThermalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalView.swift; sourceTree = "<group>"; };
 		F010 /* Metrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metrics.swift; sourceTree = "<group>"; };
 		F011 /* LegacyShellParsers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyShellParsers.swift; sourceTree = "<group>"; };
 		F012 /* CacheCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheCleaner.swift; sourceTree = "<group>"; };
@@ -53,6 +57,14 @@
 		TF02 /* LegacyShellParsersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyShellParsersTests.swift; sourceTree = "<group>"; };
 		TF03 /* CachePathValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachePathValidatorTests.swift; sourceTree = "<group>"; };
 		TPRD /* MacMonitorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MacMonitorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F020 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		F021 /* DetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailScreen.swift; sourceTree = "<group>"; };
+		F022 /* ProcessorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessorView.swift; sourceTree = "<group>"; };
+		F023 /* MemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryView.swift; sourceTree = "<group>"; };
+		F024 /* StorageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageView.swift; sourceTree = "<group>"; };
+		F025 /* NetworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkView.swift; sourceTree = "<group>"; };
+		F026 /* BatteryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryView.swift; sourceTree = "<group>"; };
+		F027 /* ProcessesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessesView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -90,14 +102,20 @@
 				F003 /* SystemMonitor.swift */,
 				F004 /* Components.swift */,
 				F005 /* OverviewView.swift */,
-				F006 /* Views.swift */,
 				F007 /* CleanerView.swift */,
 				F008 /* Info.plist */,
-				F009 /* ThermalView.swift */,
 				F010 /* Metrics.swift */,
 				F011 /* LegacyShellParsers.swift */,
 				F012 /* CacheCleaner.swift */,
 				F013 /* NativeCollectors.swift */,
+				F020 /* DesignSystem.swift */,
+				F021 /* DetailScreen.swift */,
+				F022 /* ProcessorView.swift */,
+				F023 /* MemoryView.swift */,
+				F024 /* StorageView.swift */,
+				F025 /* NetworkView.swift */,
+				F026 /* BatteryView.swift */,
+				F027 /* ProcessesView.swift */,
 			);
 			path = MacMonitor;
 			sourceTree = "<group>";
@@ -232,13 +250,19 @@
 				A003 /* SystemMonitor.swift in Sources */,
 				A004 /* Components.swift in Sources */,
 				A005 /* OverviewView.swift in Sources */,
-				A006 /* Views.swift in Sources */,
 				A007 /* CleanerView.swift in Sources */,
-				A008 /* ThermalView.swift in Sources */,
 				A009 /* Metrics.swift in Sources */,
 				A010 /* LegacyShellParsers.swift in Sources */,
 				A011 /* CacheCleaner.swift in Sources */,
 				A012 /* NativeCollectors.swift in Sources */,
+				A020 /* DesignSystem.swift in Sources */,
+				A021 /* DetailScreen.swift in Sources */,
+				A022 /* ProcessorView.swift in Sources */,
+				A023 /* MemoryView.swift in Sources */,
+				A024 /* StorageView.swift in Sources */,
+				A025 /* NetworkView.swift in Sources */,
+				A026 /* BatteryView.swift in Sources */,
+				A027 /* ProcessesView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,59 +1,81 @@
 import SwiftUI
 
-// MARK: - Gauge Ring
+// Reusable pieces of the interface.
+//
+// Two rules run through all of them. Every number that changes while you watch it
+// carries .monospacedDigit(), because proportional digits have different widths and
+// the layout shifts on every refresh. And every element that carries meaning has an
+// accessibility label and value that say the reading, not the name of the component:
+// a shape drawn with Path is completely invisible to VoiceOver otherwise.
+
+// MARK: - Ring gauge
 
 struct RingGauge: View {
-    var value: Double // 0 to 1
-    var color: Color
-    var size: CGFloat = 80
-    var lineWidth: CGFloat = 8
+    var value: Double            // 0 to 1
+    var status: Status
+    var size: CGFloat = 76
+    var lineWidth: CGFloat = 7
     var label: String
-    var sublabel: String
-    
+    var detail: String
+
+    /// Rounded once, here, and used for both the centre and the caption. They were
+    /// computed separately before - Int() truncating in one place, %.0f rounding in
+    /// the other - so the same gauge could read 45% in its middle and 46% below it.
+    private var percentText: String { Format.percent(ratio: value) }
+
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 5) {
             ZStack {
                 Circle()
-                    .stroke(color.opacity(0.12), lineWidth: lineWidth)
+                    .stroke(status.colour.opacity(0.12), lineWidth: lineWidth)
                 Circle()
-                    .trim(from: 0, to: min(value, 1))
-                    .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .trim(from: 0, to: min(max(value, 0), 1))
+                    .stroke(status.colour, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .animation(.easeInOut(duration: 0.5), value: value)
-                VStack(spacing: 1) {
-                    Text("\(Int(value * 100))%")
-                        .font(.system(size: size * 0.22, weight: .semibold, design: .rounded))
-                        .foregroundColor(.primary)
-                }
+                    .animation(.easeInOut(duration: 0.4), value: value)
+                Text(percentText)
+                    .font(.system(size: size * 0.25, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
             }
             .frame(width: size, height: size)
-            
+
             Text(label)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundColor(.primary)
-            Text(sublabel)
+            Text(detail)
                 .font(.caption2)
+                .monospacedDigit()
                 .foregroundColor(.secondary)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue("\(percentText), \(detail), \(status.label)")
     }
 }
 
-// MARK: - Sparkline with moving averages
+// MARK: - Sparkline
 
 struct Sparkline: View {
-    var data: [Double]           // 60 pts live (2 min)
-    var longData: [Double] = []  // 1800 pts (1h) - source for the m1/m5/m15/h1 averages
-    var color: Color
-    var height: CGFloat = 40
-    var showAverages: Bool = true
+    var data: [Double]              // 60 points, roughly two minutes
+    var longData: [Double] = []     // 1800 points, roughly an hour
+    /// What the numbers mean. Without it the view normalised on whatever maximum
+    /// happened to be in its own data, so an idle CPU and a saturated one drew the
+    /// same picture, and three callers fed it percentages, ratios and a state code
+    /// with no way to tell them apart.
+    var scale: SparklineScale
+    var colour: Color
+    var height: CGFloat = 38
+    var showTrend: Bool = true
+    /// Spoken by VoiceOver in place of the shape.
+    var accessibilityDescription: String
 
-    /// Downsamples longData to `outCount` points by averaging each bucket.
+    /// Downsamples longData by averaging each bucket.
     ///
     /// Replaces a per-render moving average that recomputed four windows of
-    /// 1800/450/150/30 points from inside `body` - roughly 146 000 additions per
-    /// sparkline per render, on the main thread, memoised nowhere. One pass gives the
-    /// same visual result for a fraction of the work.
+    /// 1800/450/150/30 points from inside `body` - roughly 146,000 additions per
+    /// sparkline per render, on the main thread, memoised nowhere. One bucket-averaged
+    /// pass gives a trend line of the same shape at a fraction of the cost; it replaces
+    /// the four moving averages rather than reproducing them.
     private func downsampled(_ source: [Double], into outCount: Int) -> [Double] {
         guard outCount > 0 else { return [] }
         guard source.count > outCount else { return source }
@@ -66,83 +88,77 @@ struct Sparkline: View {
         }
     }
 
-    private func makePath(data pts: [Double], in geo: GeometryProxy, safeMax: Double) -> Path {
+    private func makePath(_ points: [Double], in geo: GeometryProxy, ceiling: Double, closed: Bool) -> Path {
         var path = Path()
-        guard pts.count > 1 else { return path }
-        let w = geo.size.width
-        let h = geo.size.height
-        let step = w / CGFloat(pts.count - 1)
-        for (i, val) in pts.enumerated() {
+        guard points.count > 1, ceiling > 0 else { return path }
+        let w = geo.size.width, h = geo.size.height
+        let step = w / CGFloat(points.count - 1)
+        if closed { path.move(to: CGPoint(x: 0, y: h)) }
+        for (i, value) in points.enumerated() {
             let x = CGFloat(i) * step
-            let y = h - (CGFloat(val / safeMax) * h * 0.88)
-            if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
-            else       { path.addLine(to: CGPoint(x: x, y: y)) }
+            let y = h - (CGFloat(min(value / ceiling, 1)) * h * 0.9)
+            if i == 0 && !closed { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
         }
-        return path
-    }
-
-    private func makeFill(data pts: [Double], in geo: GeometryProxy, safeMax: Double) -> Path {
-        var path = Path()
-        guard pts.count > 1 else { return path }
-        let w = geo.size.width
-        let h = geo.size.height
-        let step = w / CGFloat(pts.count - 1)
-        path.move(to: CGPoint(x: 0, y: h))
-        for (i, val) in pts.enumerated() {
-            let x = CGFloat(i) * step
-            let y = h - (CGFloat(val / safeMax) * h * 0.88)
-            path.addLine(to: CGPoint(x: x, y: y))
+        if closed {
+            path.addLine(to: CGPoint(x: w, y: h))
+            path.closeSubpath()
         }
-        path.addLine(to: CGPoint(x: w, y: h))
-        path.closeSubpath()
         return path
     }
 
     var body: some View {
         GeometryReader { geo in
-            let allData   = showAverages && !longData.isEmpty ? longData : data
-            let globalMax = allData.max() ?? 1
-            let safeMax   = globalMax < 0.01 ? 1.0 : globalMax
-
-            let trend = showAverages && longData.count > 30 ? downsampled(longData, into: 60) : []
+            let ceiling = scale.upperBound(for: showTrend && !longData.isEmpty ? longData : data)
+            let trend = showTrend && longData.count > 30 ? downsampled(longData, into: 60) : []
 
             ZStack {
                 // Live fill, behind everything else
-                makeFill(data: data, in: geo, safeMax: safeMax)
-                    .fill(LinearGradient(
-                        colors: [color.opacity(0.18), color.opacity(0.02)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
+                makePath(data, in: geo, ceiling: ceiling, closed: true)
+                    .fill(LinearGradient(colors: [colour.opacity(0.18), colour.opacity(0.02)],
+                                         startPoint: .top, endPoint: .bottom))
 
                 if !trend.isEmpty {
-                    makePath(data: trend, in: geo, safeMax: safeMax)
-                        .stroke(color.opacity(0.35),
+                    makePath(trend, in: geo, ceiling: ceiling, closed: false)
+                        .stroke(colour.opacity(0.35),
                                 style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
                 }
 
                 // Live curve - the most visible one
-                makePath(data: data, in: geo, safeMax: safeMax)
-                    .stroke(color, style: StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round))
+                makePath(data, in: geo, ceiling: ceiling, closed: false)
+                    .stroke(colour, style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
             }
         }
         .frame(height: height)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityDescription)
+        .accessibilityValue(currentReading)
+    }
+
+    private var currentReading: String {
+        guard let latest = data.last else { return "no data" }
+        switch scale {
+        case .percent: return Format.percent(latest)
+        case .ratio: return Format.percent(ratio: latest)
+        case .relative: return Format.decimal(latest)
+        }
     }
 }
 
-// MARK: - Moving-average legend
 struct SparklineLegend: View {
-    var color: Color
+    var colour: Color
 
     var body: some View {
-        HStack(spacing: 14) {
-            LegendItem(color: color, opacity: 1.0,  width: 2.0, label: "Live, 2 min")
-            LegendItem(color: color, opacity: 0.35, width: 1.2, label: "Trend, 1 h")
+        HStack(spacing: 12) {
+            LegendItem(colour: colour, opacity: 1.0, width: 1.8, label: "Live, 2 min")
+            LegendItem(colour: colour, opacity: 0.35, width: 1.2, label: "Trend, 1 h")
         }
+        // The legend explains the drawing; VoiceOver gets the reading instead.
+        .accessibilityHidden(true)
     }
 }
 
 struct LegendItem: View {
-    var color: Color
+    var colour: Color
     var opacity: Double
     var width: CGFloat
     var label: String
@@ -150,135 +166,109 @@ struct LegendItem: View {
     var body: some View {
         HStack(spacing: 4) {
             RoundedRectangle(cornerRadius: 1)
-                .fill(color.opacity(opacity))
-                .frame(width: 14, height: width + 0.5)
+                .fill(colour.opacity(opacity))
+                .frame(width: 12, height: width)
             Text(label)
-                .font(.system(size: 10))
+                .font(.caption2)
                 .foregroundColor(.secondary)
         }
     }
 }
 
-// MARK: - Stat Card
+// MARK: - Stat card
 
 struct StatCard<Content: View>: View {
     var title: String
     var icon: String
-    var iconColor: Color
+    var iconColour: Color
     @ViewBuilder var content: () -> Content
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .foregroundColor(iconColor)
-                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(iconColour)
+                    .font(.system(size: 12, weight: .medium))
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.primary)
+                    .font(.system(size: 12, weight: .semibold))
             }
+            .accessibilityAddTraits(.isHeader)
+
             content()
         }
-        .padding(16)
+        .padding(14)
         .background(.background)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.06), lineWidth: 1))
-        .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.06), lineWidth: 1))
     }
 }
 
-// MARK: - Metric Row
+// MARK: - Metric row
 
 struct MetricRow: View {
     var label: String
     var value: String
-    var color: Color = .primary
-    
+    var colour: Color = .primary
+
     var body: some View {
-        HStack {
+        HStack(spacing: 8) {
             Text(label)
                 .font(.caption)
                 .foregroundColor(.secondary)
-            Spacer()
+            Spacer(minLength: 8)
             Text(value)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundColor(color)
+                .monospacedDigit()
+                .foregroundColor(colour)
         }
+        .accessibilityElement(children: .combine)
     }
 }
 
-// MARK: - Progress Bar
+// MARK: - Progress bar
 
 struct ProgressBar: View {
     var value: Double
-    var color: Color
+    var status: Status
     var height: CGFloat = 6
-    
+    /// Spoken by VoiceOver. A bare bar says nothing to it.
+    var accessibilityDescription: String
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: height / 2)
-                    .fill(color.opacity(0.12))
+                    .fill(status.colour.opacity(0.12))
                     .frame(height: height)
                 RoundedRectangle(cornerRadius: height / 2)
-                    .fill(color)
-                    .frame(width: geo.size.width * min(value, 1), height: height)
-                    .animation(.easeInOut(duration: 0.5), value: value)
+                    .fill(status.colour)
+                    .frame(width: geo.size.width * min(max(value, 0), 1), height: height)
+                    .animation(.easeInOut(duration: 0.4), value: value)
             }
         }
         .frame(height: height)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityDescription)
+        .accessibilityValue("\(Format.percent(ratio: value)), \(status.label)")
     }
 }
 
-// MARK: - Status Dot
+// MARK: - Status indicator
 
+/// Carries a shape as well as a colour.
+///
+/// The previous version was a bare coloured circle, which tells a colour-blind reader
+/// nothing and tells VoiceOver nothing at all.
 struct StatusDot: View {
-    var color: Color
+    var status: Status
+    var accessibilityDescription: String
+
     var body: some View {
-        Circle()
-            .fill(color)
-            .frame(width: 8, height: 8)
+        Image(systemName: status.symbol)
+            .font(.caption)
+            .foregroundColor(status.colour)
+            .accessibilityLabel(accessibilityDescription)
+            .accessibilityValue(status.label)
     }
-}
-
-// MARK: - Color helpers
-
-extension Color {
-    static func statusColor(for value: Double) -> Color {
-        if value < 0.6 { return .green }
-        if value < 0.8 { return .orange }
-        return .red
-    }
-}
-
-// MARK: - Size formatters
-
-/// Formats a throughput in bytes per second.
-func formatRate(_ bytesPerSecond: Double) -> String {
-    let b = max(bytesPerSecond, 0)
-    if b >= 1_000_000 { return String(format: "%.1f MB/s", b / 1_000_000) }
-    if b >= 1_000 { return String(format: "%.0f KB/s", b / 1_000) }
-    return "0 KB/s"
-}
-
-/// Formats a value already expressed in BINARY gigabytes (2^30). Use for memory,
-/// which is what the hardware and the kernel report.
-func formatMemoryGB(_ gb: Double) -> String {
-    if gb < 0.1 { return "\(Int(gb * 1024)) MB" }
-    return String(format: "%.1f GB", gb)
-}
-
-/// Formats a raw byte count in decimal units, the way Finder shows file sizes.
-func formatBytes(_ bytes: Int64) -> String {
-    let gb = Double(bytes) / 1_000_000_000
-    if gb >= 1 { return String(format: "%.1f GB", gb) }
-    return "\(bytes / 1_000_000) MB"
-}
-
-/// Formats a value already expressed in DECIMAL gigabytes (10^9). Use for storage,
-/// which is how Finder and System Settings count it.
-func formatStorageGB(_ gb: Double) -> String {
-    if gb < 0.1 { return "\(Int(gb * 1000)) MB" }
-    return String(format: "%.1f GB", gb)
 }

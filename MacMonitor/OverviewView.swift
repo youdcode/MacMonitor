@@ -2,190 +2,153 @@ import SwiftUI
 
 struct OverviewView: View {
     @ObservedObject var monitor: SystemMonitor
-    
+
+    private var verdict: HealthVerdict {
+        HealthVerdict.evaluate(cpuBusyPercent: monitor.cpu.total,
+                               memoryOccupancy: monitor.ram.occupancy,
+                               diskOccupancy: monitor.disk.usedPercent,
+                               swapUsedGB: monitor.ram.swapUsedGB)
+    }
+
+    private var verdictStatus: Status {
+        switch verdict {
+        case .allGood: return .normal
+        case .oneIssue: return .warning
+        case .severalIssues: return .critical
+        }
+    }
+
+    private var verdictText: String {
+        switch verdict {
+        case .allGood: return "All good"
+        case .oneIssue: return "One issue to look at"
+        case .severalIssues: return "Several issues to look at"
+        }
+    }
+
+    private var thermalStatus: Status {
+        switch monitor.thermal.thermalLevel {
+        case "Critical": return .critical
+        case "Serious", "Fair": return .warning
+        default: return .normal
+        }
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                
-                // Header
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Overview")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                        Text(monitor.macOS)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(Date(), style: .time)
-                            .font(.title3)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                        Text("Uptime: \(monitor.uptime)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+        DetailScreen(title: "Overview", subtitle: "\(monitor.macModel) - up \(monitor.uptime)") {
+
+            HStack(spacing: 10) {
+                StatusDot(status: verdictStatus, accessibilityDescription: "Overall state")
+                Text(verdictText)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(verdictStatus.colour)
+
+                Spacer()
+
+                HStack(spacing: 6) {
+                    Image(systemName: "thermometer.medium")
+                        .font(.caption)
+                        .foregroundColor(thermalStatus.colour)
+                    Text(monitor.thermal.thermalLevel)
+                        .font(.caption)
+                        .foregroundColor(thermalStatus.colour)
                 }
-                .padding(.bottom, 4)
-                
-                // Global health
-                let overallHealth = overallScore()
-                HStack(spacing: 12) {
-                    StatusDot(color: overallHealth.color)
-                    Text(overallHealth.label)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(overallHealth.color)
-                    Spacer()
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Thermal state")
+                .accessibilityValue(monitor.thermal.thermalLevel)
+            }
+            .padding(10)
+            .background(verdictStatus.colour.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            HStack(spacing: 18) {
+                Spacer()
+                RingGauge(value: monitor.cpu.total / 100,
+                          status: Status.forOccupancy(monitor.cpu.total / 100),
+                          label: "Processor",
+                          detail: Format.percent(monitor.cpu.total))
+                RingGauge(value: monitor.ram.occupancy,
+                          status: Status.forOccupancy(monitor.ram.occupancy),
+                          label: "Memory",
+                          detail: "\(Format.memory(monitor.ram.usedGB)) / \(Format.memory(monitor.ram.totalGB))")
+                RingGauge(value: monitor.disk.usedPercent,
+                          status: Status.forOccupancy(monitor.disk.usedPercent),
+                          label: "Storage",
+                          detail: "\(Format.storage(monitor.disk.freeGB)) free")
+                if monitor.battery.isPresent {
+                    RingGauge(value: Double(monitor.battery.percentage) / 100,
+                              status: monitor.battery.percentage > 20 ? .normal : .critical,
+                              label: "Battery",
+                              detail: "\(monitor.battery.percentage)%")
                 }
-                .padding(12)
-                .background(overallHealth.color.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                
-                // Main gauges
-                HStack(spacing: 24) {
-                    Spacer()
-                    RingGauge(
-                        value: monitor.cpu.total / 100,
-                        color: .statusColor(for: monitor.cpu.total / 100),
-                        size: 90,
-                        label: "CPU",
-                        sublabel: String(format: "%.0f%%", monitor.cpu.total)
-                    )
-                    RingGauge(
-                        value: monitor.ram.occupancy,
-                        color: .statusColor(for: monitor.ram.occupancy),
-                        size: 90,
-                        label: "Memory",
-                        sublabel: "\(formatMemoryGB(monitor.ram.usedGB)) / \(formatMemoryGB(monitor.ram.totalGB))"
-                    )
-                    RingGauge(
-                        value: monitor.disk.usedPercent,
-                        color: .statusColor(for: monitor.disk.usedPercent),
-                        size: 90,
-                        label: "Storage",
-                        sublabel: "\(formatStorageGB(monitor.disk.usedGB)) / \(formatStorageGB(monitor.disk.totalGB))"
-                    )
-                    if monitor.battery.isPresent {
-                        RingGauge(
-                            value: Double(monitor.battery.percentage) / 100,
-                            color: batteryColor(),
-                            size: 90,
-                            label: "Battery",
-                            sublabel: "\(monitor.battery.percentage)%"
-                        )
-                    }
-                    Spacer()
-                }
-                .padding(.vertical, 8)
-                
-                // Cards grid
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    
-                    // CPU card
-                    StatCard(title: "CPU", icon: "cpu", iconColor: .blue) {
-                        Sparkline(data: monitor.cpu.history, longData: monitor.cpu.longHistory, color: .blue)
-                        HStack {
-                            MetricRow(label: "User", value: String(format: "%.1f%%", monitor.cpu.user))
+                Spacer()
+            }
+            .padding(.vertical, 4)
+
+            if !monitor.alerts.isEmpty {
+                StatCard(title: "Alerts", icon: "bell.badge", iconColour: .orange) {
+                    ForEach(monitor.alerts) { alert in
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: alert.level == .critical ? Status.critical.symbol : Status.warning.symbol)
+                                .font(.caption)
+                                .foregroundColor(alert.level == .critical ? .red : .orange)
+                            Text(alert.message)
+                                .font(.caption)
+                                .foregroundColor(alert.level == .critical ? .red : .orange)
+                                .fixedSize(horizontal: false, vertical: true)
                             Spacer()
-                            MetricRow(label: "System", value: String(format: "%.1f%%", monitor.cpu.system))
-                        }
-                    }
-                    
-                    // Memory card
-                    StatCard(title: "Memory", icon: "memorychip", iconColor: .purple) {
-                        Sparkline(data: monitor.ram.history.map { $0 }, color: .purple)
-                        MetricRow(label: "Used", value: formatMemoryGB(monitor.ram.usedGB))
-                        MetricRow(label: "Free", value: formatMemoryGB(monitor.ram.freeGB))
-                        MetricRow(label: "Swap", value: formatMemoryGB(monitor.ram.swapUsedGB),
-                                  color: monitor.ram.swapUsedGB > 0.5 ? .orange : .secondary)
-                    }
-                    
-                    // Storage card
-                    StatCard(title: "Storage", icon: "internaldrive", iconColor: .teal) {
-                        ProgressBar(value: monitor.disk.usedPercent, color: .statusColor(for: monitor.disk.usedPercent))
-                        MetricRow(label: "Used", value: formatStorageGB(monitor.disk.usedGB))
-                        MetricRow(label: "Free", value: formatStorageGB(monitor.disk.freeGB),
-                                  color: monitor.disk.freeGB < 20 ? .orange : .green)
-                    }
-                    
-                    // Battery card
-                    if monitor.battery.isPresent {
-                        StatCard(title: "Battery", icon: "battery.100", iconColor: batteryColor()) {
-                            ProgressBar(value: Double(monitor.battery.percentage) / 100, color: batteryColor())
-                            MetricRow(label: "Status", value: monitor.battery.isCharging ? "Charging" : "On battery")
-                            MetricRow(label: "Cycles", value: "\(monitor.battery.cycleCount)")
-                            MetricRow(label: "Condition", value: monitor.battery.health,
-                                      color: monitor.battery.health == "Normal" ? .green : .orange)
-                        }
-                    }
-                }
-                
-                // GPU and network
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    StatCard(title: "GPU", icon: "cpu.fill", iconColor: .pink) {
-                        if let g = monitor.gpu, let device = g.deviceUtilization {
-                            ProgressBar(value: device / 100, color: .statusColor(for: device / 100))
-                            MetricRow(label: "Device", value: String(format: "%.0f%%", device))
-                            if let r = g.rendererUtilization { MetricRow(label: "Renderer", value: String(format: "%.0f%%", r)) }
-                            if let t = g.tilerUtilization { MetricRow(label: "Tiler", value: String(format: "%.0f%%", t)) }
-                        } else {
-                            Text("No accelerator reported").font(.caption).foregroundColor(.secondary)
-                        }
-                    }
-
-                    StatCard(title: "Network", icon: "network", iconColor: .indigo) {
-                        if let n = monitor.networkRate {
-                            MetricRow(label: "Down", value: formatRate(n.inBytesPerSecond))
-                            MetricRow(label: "Up", value: formatRate(n.outBytesPerSecond))
-                        } else {
-                            Text("Sampling...").font(.caption).foregroundColor(.secondary)
-                        }
-                    }
-                }
-
-                // Top processes, quick view
-                StatCard(title: "Active processes", icon: "list.bullet", iconColor: .orange) {
-                    ForEach(monitor.processes.prefix(5)) { proc in
-                        HStack {
-                            Text(proc.name)
-                                .font(.caption)
-                                .lineLimit(1)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            Text(String(format: "%.1f%%", proc.cpuPercent))
-                                .font(.caption)
-                                .foregroundColor(proc.cpuPercent > 20 ? .orange : .secondary)
-                                .frame(width: 50, alignment: .trailing)
-                            Text(String(format: "%.0f MB", proc.memoryMB))
-                                .font(.caption)
+                            Text(alert.timestamp, style: .time)
+                                .font(.caption2)
+                                .monospacedDigit()
                                 .foregroundColor(.secondary)
-                                .frame(width: 60, alignment: .trailing)
                         }
+                        .accessibilityElement(children: .combine)
                     }
                 }
             }
-            .padding(24)
-        }
-        .background(Color(NSColor.windowBackgroundColor))
-    }
-    
-    func batteryColor() -> Color {
-        if monitor.battery.isCharging { return .green }
-        if monitor.battery.percentage > 50 { return .green }
-        if monitor.battery.percentage > 20 { return .orange }
-        return .red
-    }
-    
-    func overallScore() -> (label: String, color: Color) {
-        switch HealthVerdict.evaluate(cpuBusyPercent: monitor.cpu.total,
-                                      memoryOccupancy: monitor.ram.occupancy,
-                                      diskOccupancy: monitor.disk.usedPercent,
-                                      swapUsedGB: monitor.ram.swapUsedGB) {
-        case .allGood:        return ("All good - your Mac is healthy", .green)
-        case .oneIssue:       return ("One issue to look at", .orange)
-        case .severalIssues:  return ("Several issues detected", .red)
+
+            HStack(alignment: .top, spacing: 12) {
+                StatCard(title: "Processor", icon: "cpu", iconColour: .blue) {
+                    Sparkline(data: monitor.cpu.history,
+                              longData: monitor.cpu.longHistory,
+                              scale: .percent,
+                              colour: .blue,
+                              accessibilityDescription: "Processor load over the last two minutes")
+                    MetricRow(label: "User", value: Format.percent(monitor.cpu.user))
+                    MetricRow(label: "System", value: Format.percent(monitor.cpu.system))
+                }
+
+                StatCard(title: "Memory", icon: "memorychip", iconColour: .purple) {
+                    Sparkline(data: monitor.ram.history,
+                              longData: monitor.ram.longHistory,
+                              scale: .ratio,
+                              colour: .purple,
+                              accessibilityDescription: "Memory in use over the last two minutes")
+                    MetricRow(label: "In use", value: Format.memory(monitor.ram.usedGB))
+                    MetricRow(label: "Pressure", value: monitor.ram.pressureLevel.label)
+                }
+            }
+
+            StatCard(title: "Busiest processes", icon: "list.bullet", iconColour: .orange) {
+                ForEach(monitor.processes.prefix(5)) { proc in
+                    HStack {
+                        Text(proc.name)
+                            .font(.caption)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(Format.percent(proc.cpuPercent))
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundColor(proc.cpuPercent > 20 ? .orange : .secondary)
+                            .frame(width: 52, alignment: .trailing)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(proc.name)
+                    .accessibilityValue("\(Format.percent(proc.cpuPercent)) CPU")
+                }
+            }
         }
     }
 }

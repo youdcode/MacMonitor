@@ -62,7 +62,7 @@ struct CleanerView: View {
                     .frame(maxWidth: .infinity)
                     .padding(40)
                 } else {
-                    StatCard(title: "Caches", icon: "archivebox", iconColor: .orange) {
+                    StatCard(title: "Caches", icon: "archivebox", iconColour: .orange) {
                         VStack(spacing: 0) {
                             HStack {
                                 Button("Select all") { setAllSelected(true) }
@@ -72,7 +72,7 @@ struct CleanerView: View {
                                     .buttonStyle(.borderless)
                                     .foregroundColor(.secondary)
                                 Spacer()
-                                Text("\(monitor.caches.count) items, \(formatBytes(totalBytes)) total")
+                                Text("\(monitor.caches.count) items, \(Format.bytes(totalBytes)) total")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -106,7 +106,7 @@ struct CleanerView: View {
                                 Text("\(selected.count) item\(selected.count > 1 ? "s" : "") selected")
                                     .font(.subheadline)
                                     .fontWeight(.medium)
-                                Text("\(formatBytes(selectedBytes)) to move to the Trash")
+                                Text("\(Format.bytes(selectedBytes)) to move to the Trash")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -155,7 +155,7 @@ struct CleanerView: View {
             Button("Cancel", role: .cancel) {}
             Button("Move to Trash") { monitor.cleanSelectedCaches() }
         } message: {
-            Text("\(formatBytes(selectedBytes)) will be moved to the Trash. Nothing is freed on disk until you empty it.")
+            Text("\(Format.bytes(selectedBytes)) will be moved to the Trash. Nothing is freed on disk until you empty it.")
         }
     }
 
@@ -178,7 +178,7 @@ struct CleanupReportCard: View {
                     Text("Preview: \(report.outcomes.count) item\(report.outcomes.count > 1 ? "s" : "") would be moved to the Trash")
                         .font(.subheadline)
                 } else {
-                    Text("\(formatBytes(report.movedBytes)) moved to the Trash. Empty the Trash to reclaim it on disk.")
+                    Text("\(Format.bytes(report.movedBytes)) moved to the Trash. Empty the Trash to reclaim it on disk.")
                         .font(.subheadline)
                 }
                 Spacer()
@@ -225,7 +225,7 @@ struct CacheRow: View {
             }
             .toggleStyle(.checkbox)
             .labelsHidden()
-            .accessibilityLabel("Select \(item.name), \(formatBytes(item.sizeBytes))")
+            .accessibilityLabel("Select \(item.name), \(Format.bytes(item.sizeBytes))")
 
             Image(systemName: item.icon)
                 .foregroundColor(.secondary)
@@ -255,7 +255,7 @@ struct CacheRow: View {
 
             Spacer()
 
-            Text(formatBytes(item.sizeBytes))
+            Text(Format.bytes(item.sizeBytes))
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundColor(item.sizeBytes > 1_000_000_000 ? .orange : .primary)
                 .frame(width: 80, alignment: .trailing)
