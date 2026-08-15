@@ -141,10 +141,14 @@ The test fills the link for ten seconds in each direction. That means what it mo
 not a property of the test at all — it is whatever your connection can carry. Ten
 seconds at 1 Mbit/s is 1.25 MB, and it scales from there.
 
-The screen states that rule and one measured example rather than a single figure. It
-used to say "about 885 MB", which was true of one machine on one evening and would be
-wrong by an order of magnitude on a slower line. Every complete run measured while
-building this:
+So the screen does not name a figure of its own. Before the first run it states the
+rule; after one, it states what **your** last test moved, because by then the app has
+measured your connection and has no need to guess at it. The old text said "about
+885 MB", which was measured, honest, and a property of one machine on one evening — on
+a 10 Mbit/s line the same test costs 12.5 MB, and the warning would have frightened off
+the one reader it existed to protect.
+
+Every complete run measured while building this:
 
 | rate | moved | rule predicts |
 |---:|---:|---:|

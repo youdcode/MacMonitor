@@ -60,10 +60,31 @@ struct NetworkView: View {
     private var capacityTest: some View {
         StatCard(title: "Speed test", icon: "gauge.high", iconColour: .indigo) {
             // Stated before the button, not in a footnote: on a metered connection this
-            // is the whole decision. And stated as a rule rather than a single number,
-            // because the test fills the link for ten seconds each way and so costs
-            // whatever the link can carry.
-            Text("The test fills the link for ten seconds in each direction, so it moves about \(SpeedTestFacts.megabytesPerMegabitPerSecond, specifier: "%.2f") MB for every Mbit/s your connection carries - each way. One run on the machine this was written on moved \(SpeedTestFacts.measuredDownloadMegabytes) MB down and \(SpeedTestFacts.measuredUploadMegabytes) MB up. It runs the ndt7 test against M-Lab servers, only when you start it, and never on its own.")
+            // is the whole decision.
+            //
+            // Once a complete test has been made, this is the reader's own last figure
+            // rather than a rule they have to apply to themselves. It used to be a
+            // number measured on the author's machine, which was wrong for everybody
+            // else and most wrong for the people on a slow line - the ones the warning
+            // is for.
+            if let last = speedTest.lastVolume {
+                Text("Your last test, on \(last.at.formatted(date: .abbreviated, time: .omitted)), moved \(Format.bytes(Int64(last.downloadBytes))) down and \(Format.bytes(Int64(last.uploadBytes))) up: \(Format.bytes(Int64(last.totalBytes))) in all.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("It fills the link for ten seconds each way, so what it moves follows what your connection carries - about \(SpeedTestFacts.megabytesPerMegabitPerSecond, specifier: "%.2f") MB for every Mbit/s, in each direction.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("The test fills the link for ten seconds in each direction, so what it moves is not a fixed amount: it follows what your connection carries, about \(SpeedTestFacts.megabytesPerMegabitPerSecond, specifier: "%.2f") MB for every Mbit/s, each way. After the first run this line says what yours actually cost.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Text("It runs the ndt7 test against M-Lab servers, only when you start it, and never on its own.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

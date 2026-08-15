@@ -98,6 +98,59 @@ final class NetworkMetricsTests: XCTestCase {
         XCTAssertEqual(result.totalBytes, 390_000_000)
     }
 
+    // MARK: - Remembering what a run cost
+
+    /// The record exists so the warning before the button can be about the reader's own
+    /// connection. A run that only got half way through would understate the next full
+    /// test by exactly the missing half, so it is not kept.
+    func testOnlyARunThatFinishedBothHalvesIsRemembered() {
+        let complete = SpeedTestResult(downloadMegabitsPerSecond: 521, downloadBytes: 652_000_000,
+                                       uploadMegabitsPerSecond: 399, uploadBytes: 503_000_000,
+                                       uploadFailure: nil, server: "", finishedAt: Date())
+        XCTAssertEqual(complete.completedVolume?.downloadBytes, 652_000_000)
+        XCTAssertEqual(complete.completedVolume?.uploadBytes, 503_000_000)
+        XCTAssertEqual(complete.completedVolume?.totalBytes, 1_155_000_000)
+
+        let uploadFailed = SpeedTestResult(downloadMegabitsPerSecond: 521, downloadBytes: 652_000_000,
+                                           uploadMegabitsPerSecond: nil, uploadBytes: 0,
+                                           uploadFailure: "the socket closed", server: "", finishedAt: Date())
+        XCTAssertNil(uploadFailed.completedVolume)
+    }
+
+    func testAVolumeSurvivesBeingWrittenAndReadBack() {
+        let name = "io.github.youdcode.macmonitor.tests.volume"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+
+        let store = SpeedTestVolumeStore(defaults: defaults)
+        XCTAssertNil(store.read(), "an untouched store has nothing to say")
+
+        let when = Date(timeIntervalSinceReferenceDate: 807_000_000)
+        store.write(SpeedTestVolume(downloadBytes: 652_000_000, uploadBytes: 503_000_000, at: when))
+
+        let read = store.read()
+        XCTAssertEqual(read?.downloadBytes, 652_000_000)
+        XCTAssertEqual(read?.uploadBytes, 503_000_000)
+        XCTAssertEqual(read?.at.timeIntervalSinceReferenceDate ?? 0, 807_000_000, accuracy: 0.001)
+    }
+
+    /// Half a record is not a small record, it is a claim about a test that did not
+    /// happen. Reading gives back nothing until all three values are there.
+    func testAHalfWrittenRecordReadsAsNothing() {
+        let name = "io.github.youdcode.macmonitor.tests.partial"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+
+        defaults.set(652_000_000, forKey: "speedTest.lastDownloadBytes")
+        XCTAssertNil(SpeedTestVolumeStore(defaults: defaults).read())
+
+        defaults.set(503_000_000, forKey: "speedTest.lastUploadBytes")
+        XCTAssertNil(SpeedTestVolumeStore(defaults: defaults).read(), "still no date")
+
+        defaults.set(807_000_000.0, forKey: "speedTest.lastRunAt")
+        XCTAssertNotNil(SpeedTestVolumeStore(defaults: defaults).read())
+    }
+
     // MARK: - Gauge scale
 
     func testTheStopsAreOneAndOneThousand() {

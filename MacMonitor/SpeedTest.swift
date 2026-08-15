@@ -41,6 +41,66 @@ struct SpeedTestResult: Equatable {
     var totalBytes: Int { downloadBytes + uploadBytes }
 }
 
+/// What one complete test moved, kept between launches.
+///
+/// The point of remembering it is that the warning before the button can then be about
+/// the reader's own connection. A figure measured on the author's machine is exactly
+/// wrong for the people the warning exists for: on a 10 Mbit/s line the test costs
+/// 12.5 MB, and telling that reader it costs 885 would frighten off the one person it
+/// was written to protect.
+struct SpeedTestVolume: Equatable {
+    let downloadBytes: Int
+    let uploadBytes: Int
+    let at: Date
+
+    var totalBytes: Int { downloadBytes + uploadBytes }
+}
+
+extension SpeedTestResult {
+    /// Only a run that finished BOTH halves is worth remembering. A download-only run
+    /// under-states the next full test by exactly the upload half, and a warning about
+    /// what something costs is the wrong place to be short by half.
+    var completedVolume: SpeedTestVolume? {
+        guard uploadMegabitsPerSecond != nil, downloadBytes > 0, uploadBytes > 0 else { return nil }
+        return SpeedTestVolume(downloadBytes: downloadBytes, uploadBytes: uploadBytes, at: finishedAt)
+    }
+}
+
+/// Where the last complete test's volume is kept.
+///
+/// Three plain values rather than an encoded blob, so `defaults read` shows them: the
+/// interface makes a claim from this, and a claim whose source cannot be inspected is
+/// the sort of thing this application exists to avoid.
+struct SpeedTestVolumeStore {
+    private let defaults: UserDefaults
+
+    private let downloadKey = "speedTest.lastDownloadBytes"
+    private let uploadKey = "speedTest.lastUploadBytes"
+    private let dateKey = "speedTest.lastRunAt"
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    /// All three values or nothing. Half a record would be a statement about a test that
+    /// did not happen.
+    func read() -> SpeedTestVolume? {
+        let download = defaults.integer(forKey: downloadKey)
+        let upload = defaults.integer(forKey: uploadKey)
+        let seconds = defaults.double(forKey: dateKey)
+        guard download > 0, upload > 0, seconds > 0 else { return nil }
+        return SpeedTestVolume(downloadBytes: download,
+                               uploadBytes: upload,
+                               at: Date(timeIntervalSinceReferenceDate: seconds))
+    }
+
+    func write(_ volume: SpeedTestVolume) {
+        defaults.set(volume.downloadBytes, forKey: downloadKey)
+        defaults.set(volume.uploadBytes, forKey: uploadKey)
+        defaults.set(volume.at.timeIntervalSinceReferenceDate, forKey: dateKey)
+    }
+}
+
 enum SpeedTestState: Equatable {
     case idle
     case locating
@@ -56,29 +116,26 @@ enum SpeedTestState: Equatable {
 enum SpeedTestFacts {
 
     /// The test fills the link for ten seconds in each direction, so what it moves is
-    /// not a constant: it is whatever the connection carries. Ten seconds at one Mbit/s
-    /// is 1.25 MB, and it scales from there - which is why the interface states the
-    /// rule and an example rather than a single number that would be wrong on every
-    /// machine but one.
+    /// not a property of the test at all: it is whatever the connection carries. Ten
+    /// seconds at one Mbit/s is 1.25 MB, and it scales from there.
+    ///
+    /// This is the fallback, shown before the first run. Once a complete test has been
+    /// made, the screen states what THAT test moved instead - the reader's own number
+    /// rather than a rule they have to apply to themselves, or worse, a figure measured
+    /// on somebody else's connection.
     ///
     /// Verified against every run measured while building this, rate against bytes for
     /// the same run: 226 Mbit/s moved 285 MB, 254 moved 318, 263 moved 335, 312 moved
     /// 390, 316 moved 395, 350 moved 437, 399 moved 503, 521 moved 652, 674 moved 885,
     /// 688 moved 860. Every one lands within two per cent of the rule except the 674
     /// run, which lasted ten and a half seconds rather than ten.
-    static let megabytesPerMegabitPerSecond = 1.25
-
-    /// One complete run through this application, on the machine it was written on:
-    /// 316 Mbit/s down and 263 up. Stated in the interface because on a metered
-    /// connection it is the whole decision.
     ///
-    /// The interface counters were read either side of that run and saw 425.8 MB in and
-    /// 346.7 MB out, against the 395 and 335 counted here - 7.8 % and 3.5 % more, which
-    /// is packet headers and the acknowledgements each direction sends back. Two things
-    /// follow. The bytes really did leave and arrive, and nothing compressed them, which
-    /// is why the upload payloads are random rather than zeroed.
-    static let measuredDownloadMegabytes = 395
-    static let measuredUploadMegabytes = 335
+    /// The independent reference: the interface counters were read either side of one of
+    /// those runs and saw 708 MB in and 529 MB out against the 652 and 503 counted here,
+    /// 8.7 % and 5.2 % more. That is packet headers and the acknowledgements each
+    /// direction sends back - and it is also the check that nothing compressed the
+    /// upload payloads, which is why they are random rather than zeroed.
+    static let megabytesPerMegabitPerSecond = 1.25
 
     /// M-Lab documents "a rate limit of 40 tests per client per day", and says a client
     /// that hits it is answered with an HTTP 204 No Content.
@@ -103,9 +160,19 @@ enum SpeedTestFacts {
 final class SpeedTest: ObservableObject {
     @Published private(set) var state: SpeedTestState = .idle
 
+    /// The last complete run, read back at launch. nil until one has been made, which is
+    /// when the screen falls back to the rule.
+    @Published private(set) var lastVolume: SpeedTestVolume?
+
     private var task: URLSessionWebSocketTask?
     private var session: URLSession?
     private var cancelled = false
+    private let volumeStore: SpeedTestVolumeStore
+
+    init(volumeStore: SpeedTestVolumeStore = SpeedTestVolumeStore()) {
+        self.volumeStore = volumeStore
+        self.lastVolume = volumeStore.read()
+    }
 
     /// Ten seconds each way, which is what the ndt7 specification asks for: "the
     /// expected duration of a test is up to ten seconds".
@@ -148,14 +215,23 @@ final class SpeedTest: ObservableObject {
                 let up = await self.runUpload(url: endpoints.upload, downloadSoFar: down.megabitsPerSecond)
                 if self.cancelled { self.state = .cancelled; return }
 
-                self.publish(.finished(SpeedTestResult(downloadMegabitsPerSecond: down.megabitsPerSecond,
-                                                       downloadBytes: down.bytes,
-                                                       uploadMegabitsPerSecond: up.megabitsPerSecond,
-                                                       uploadBytes: up.bytes,
-                                                       uploadFailure: up.failure,
-                                                       server: endpoints.machine,
-                                                       finishedAt: Date())),
-                             force: true)
+                let result = SpeedTestResult(downloadMegabitsPerSecond: down.megabitsPerSecond,
+                                             downloadBytes: down.bytes,
+                                             uploadMegabitsPerSecond: up.megabitsPerSecond,
+                                             uploadBytes: up.bytes,
+                                             uploadFailure: up.failure,
+                                             server: endpoints.machine,
+                                             finishedAt: Date())
+
+                // Only a complete run is remembered, and it is remembered before it is
+                // shown, so what the screen says the next test will cost is the same
+                // figure it is about to display.
+                if let volume = result.completedVolume {
+                    self.volumeStore.write(volume)
+                    self.lastVolume = volume
+                }
+
+                self.publish(.finished(result), force: true)
             } catch {
                 if self.cancelled {
                     self.state = .cancelled
