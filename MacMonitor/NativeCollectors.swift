@@ -382,6 +382,49 @@ enum NativeNetwork {
     }
 }
 
+// MARK: - Hardware identity
+
+enum NativeHardware {
+
+    /// The machine's commercial name, read synchronously from the device tree.
+    ///
+    /// Measured on an M4 Pro: IODeviceTree:/product carries
+    /// "MacBook Pro (14-inch, Nov 2024)" and reads in 0.10 ms, against 186 ms for
+    /// `system_profiler SPHardwareDataType`, which answers the vaguer "MacBook Pro".
+    /// Faster, more precise, and no subprocess.
+    ///
+    /// Falls back to the model identifier from hw.model - "Mac16,8" - which is always
+    /// available and is at least true. There is no hardcoded default: showing
+    /// "MacBook Pro" on a Mac mini until something better arrives is the kind of
+    /// plausible-and-wrong value this project has spent its time removing.
+    static func modelName() -> String {
+        if let name = productName(), !name.isEmpty { return name }
+        return modelIdentifier() ?? ""
+    }
+
+    static func productName() -> String? {
+        let entry = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/product")
+        guard entry != 0 else { return nil }
+        defer { IOObjectRelease(entry) }
+
+        guard let ref = IORegistryEntryCreateCFProperty(entry, "product-name" as CFString, kCFAllocatorDefault, 0),
+              let data = ref.takeRetainedValue() as? Data,
+              let name = String(data: data, encoding: .utf8) else { return nil }
+
+        return name.trimmingCharacters(in: CharacterSet(charactersIn: "\0"))
+                   .trimmingCharacters(in: .whitespaces)
+    }
+
+    /// The model identifier, such as "Mac16,8". Not a commercial name.
+    static func modelIdentifier() -> String? {
+        var size = 0
+        guard sysctlbyname("hw.model", nil, &size, nil, 0) == 0, size > 0 else { return nil }
+        var buffer = [CChar](repeating: 0, count: size)
+        guard sysctlbyname("hw.model", &buffer, &size, nil, 0) == 0 else { return nil }
+        return String(cString: buffer)
+    }
+}
+
 // MARK: - Battery
 
 struct BatteryDetail: Equatable {

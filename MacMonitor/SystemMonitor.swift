@@ -142,7 +142,7 @@ class SystemMonitor: ObservableObject {
     @Published var isCleaning = false
     @Published var lastReport: CacheRemovalReport?
     @Published var uptime: String = ""
-    @Published var macModel: String = "MacBook Pro"
+    @Published var macModel: String = NativeHardware.modelName()
     @Published var macOS: String = ""
     @Published var loadAverages: (one: Double, five: Double, fifteen: Double)?
     @Published var gpu: GPUSample?
@@ -183,7 +183,6 @@ class SystemMonitor: ObservableObject {
 
     init() {
         macOS = ProcessInfo.processInfo.operatingSystemVersionString
-        Task { await self.fetchStaticInfo() }
         Task { await self.fetchCaches() }
         requestNotificationPermission()
         startMonitoring()
@@ -277,18 +276,6 @@ class SystemMonitor: ObservableObject {
         guard isSuspended else { return }
         isSuspended = false
         startMonitoring()
-    }
-
-    // MARK: - Static Info
-
-    func fetchStaticInfo() async {
-        let result = await runShell("system_profiler SPHardwareDataType | grep 'Model Name'")
-        for line in result.components(separatedBy: "\n") {
-            if line.contains("Model Name"), let val = line.components(separatedBy: ": ").last {
-                let model = val.trimmingCharacters(in: .whitespaces)
-                if !model.isEmpty { macModel = model }
-            }
-        }
     }
 
     // MARK: - CPU (host_cpu_load_info delta)
