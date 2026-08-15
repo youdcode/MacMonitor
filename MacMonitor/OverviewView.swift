@@ -55,8 +55,8 @@ struct OverviewView: View {
                         sublabel: String(format: "%.0f%%", monitor.cpu.total)
                     )
                     RingGauge(
-                        value: monitor.ram.pressure,
-                        color: .statusColor(for: monitor.ram.pressure),
+                        value: monitor.ram.occupancy,
+                        color: .statusColor(for: monitor.ram.occupancy),
                         size: 90,
                         label: "Memory",
                         sublabel: "\(formatMemoryGB(monitor.ram.usedGB)) / \(formatMemoryGB(monitor.ram.totalGB))"
@@ -123,6 +123,29 @@ struct OverviewView: View {
                     }
                 }
                 
+                // GPU and network
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    StatCard(title: "GPU", icon: "cpu.fill", iconColor: .pink) {
+                        if let g = monitor.gpu, let device = g.deviceUtilization {
+                            ProgressBar(value: device / 100, color: .statusColor(for: device / 100))
+                            MetricRow(label: "Device", value: String(format: "%.0f%%", device))
+                            if let r = g.rendererUtilization { MetricRow(label: "Renderer", value: String(format: "%.0f%%", r)) }
+                            if let t = g.tilerUtilization { MetricRow(label: "Tiler", value: String(format: "%.0f%%", t)) }
+                        } else {
+                            Text("No accelerator reported").font(.caption).foregroundColor(.secondary)
+                        }
+                    }
+
+                    StatCard(title: "Network", icon: "network", iconColor: .indigo) {
+                        if let n = monitor.networkRate {
+                            MetricRow(label: "Down", value: formatRate(n.inBytesPerSecond))
+                            MetricRow(label: "Up", value: formatRate(n.outBytesPerSecond))
+                        } else {
+                            Text("Sampling...").font(.caption).foregroundColor(.secondary)
+                        }
+                    }
+                }
+
                 // Top processes, quick view
                 StatCard(title: "Active processes", icon: "list.bullet", iconColor: .orange) {
                     ForEach(monitor.processes.prefix(5)) { proc in
@@ -157,7 +180,7 @@ struct OverviewView: View {
     
     func overallScore() -> (label: String, color: Color) {
         switch HealthVerdict.evaluate(cpuBusyPercent: monitor.cpu.total,
-                                      memoryOccupancy: monitor.ram.pressure,
+                                      memoryOccupancy: monitor.ram.occupancy,
                                       diskOccupancy: monitor.disk.usedPercent,
                                       swapUsedGB: monitor.ram.swapUsedGB) {
         case .allGood:        return ("All good - your Mac is healthy", .green)

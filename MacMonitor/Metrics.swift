@@ -48,7 +48,7 @@ enum CPUMath {
     ///
     /// Returns nil when there is nothing meaningful to report: no previous sample,
     /// or two samples taken so close together that no tick elapsed. Callers must
-    /// publish nothing in that case — reporting the delta against a zero baseline
+    /// publish nothing in that case - reporting the delta against a zero baseline
     /// would surface the average since boot as if it were an instant reading.
     ///
     /// Subtraction wraps deliberately: the counters are UInt32 and roll over roughly

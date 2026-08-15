@@ -1,81 +1,26 @@
 import Foundation
 
-// Transitional: these parse the textual output of shell commands.
+// Transitional: what is left of the shell-output parsing.
 //
-// They are scheduled to be replaced by native APIs — host_statistics64 for memory,
-// sysctlbyname("vm.swapusage") with xsw_usage for swap, a native process listing
-// for ps. When that lands, delete this file and its tests in the same commit
-// rather than leaving tested code that nothing calls.
+// The vm_stat and vm.swapusage parsers that lived here are gone, replaced by
+// host_statistics64 and xsw_usage. Their tests went with them, in the same commit,
+// rather than staying green over code nothing calls.
 //
-// Every function returns an optional and fails explicitly on unparseable input.
-// The original code used `?? 0` throughout, so a format change produced a
-// confident zero instead of an error.
-
-// MARK: - vm_stat
-
-struct VMStatPages: Equatable {
-    var free: Double
-    var active: Double
-    var inactive: Double
-    var wired: Double
-    /// Pages of physical RAM held by the compressor.
-    ///
-    /// vm_stat prints two lines containing the word "compressor":
-    ///   "Pages stored in compressor"    — uncompressed size of what it holds
-    ///   "Pages occupied by compressor"  — physical RAM it actually uses
-    /// Only the second is memory in use. Matching on the substring "compressor"
-    /// picks whichever comes last, which is right only by accident.
-    var occupiedByCompressor: Double
-}
-
-enum VMStatParser {
-
-    static func parse(_ output: String) -> VMStatPages? {
-        var values: [String: Double] = [:]
-
-        for line in output.components(separatedBy: "\n") {
-            let parts = line.components(separatedBy: ":")
-            guard parts.count >= 2 else { continue }
-            let key = parts[0].trimmingCharacters(in: .whitespaces)
-            let raw = parts[1].trimmingCharacters(in: CharacterSet(charactersIn: " ."))
-            guard let value = Double(raw) else { continue }
-            values[key] = value
-        }
-
-        guard let free = values["Pages free"],
-              let active = values["Pages active"],
-              let inactive = values["Pages inactive"],
-              let wired = values["Pages wired down"],
-              let occupied = values["Pages occupied by compressor"] else { return nil }
-
-        return VMStatPages(free: free,
-                           active: active,
-                           inactive: inactive,
-                           wired: wired,
-                           occupiedByCompressor: occupied)
-    }
-}
-
-// MARK: - sysctl vm.swapusage
-
-enum SwapUsageParser {
-
-    /// Parses `sysctl vm.swapusage`, whose output looks like:
-    /// `vm.swapusage: total = 4096.00M  used = 2772.75M  free = 1323.25M  (encrypted)`
-    /// Returns gigabytes.
-    static func parse(_ output: String) -> (used: Double, total: Double)? {
-        func megabytes(_ field: String) -> Double? {
-            guard let range = output.range(of: "\(field) = [0-9]+\\.?[0-9]*M", options: .regularExpression) else { return nil }
-            let digits = output[range]
-                .replacingOccurrences(of: "\(field) = ", with: "")
-                .replacingOccurrences(of: "M", with: "")
-            return Double(digits)
-        }
-
-        guard let used = megabytes("used"), let total = megabytes("total") else { return nil }
-        return (used / 1024, total / 1024)
-    }
-}
+// The two below cannot go yet:
+//
+// - ps. A non-privileged process cannot read another user's CPU time on macOS.
+//   proc_pid_rusage and proc_pidinfo both return -1 for a process it does not own
+//   (measured against launchd and WindowServer), and kinfo_proc.kp_proc.p_pctcpu is
+//   not populated at all: zero for all 609 processes on this machine. /bin/ps only
+//   manages it because it is setuid root. Going native here would silently drop
+//   every system process from the list, which is worse than spawning one process
+//   every two seconds.
+//
+// - system_profiler, for the battery cycle count and condition. Replaceable by
+//   IORegistry, which is the next lot.
+//
+// Both return an optional and fail explicitly on unparseable input. The original
+// code used ?? 0 throughout, so a format change produced a confident zero.
 
 // MARK: - ps
 
@@ -93,7 +38,7 @@ enum PSParser {
     /// Returns nil for the header row and for anything else that does not carry a
     /// numeric pid. Callers must NOT drop the first line to skip the header: once
     /// the output has been through `sort`, the header is sorted along with the rows
-    /// and lands in the middle, so dropping line one discards a real process — the
+    /// and lands in the middle, so dropping line one discards a real process - the
     /// busiest one, given the sort order.
     static func parseRow(_ line: String) -> PSRow? {
         let parts = line.split(separator: " ", maxSplits: 10, omittingEmptySubsequences: true)

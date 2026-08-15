@@ -11,109 +11,6 @@ import XCTest
 /// Fixtures are real output captured on the machine, trimmed where noted.
 final class LegacyShellParsersTests: XCTestCase {
 
-    // MARK: - vm_stat
-
-    /// Real `vm_stat` output. Note the two lines containing the word "compressor":
-    /// only "Pages occupied by compressor" is physical RAM in use.
-    private let vmStatFixture = """
-    Mach Virtual Memory Statistics: (page size of 16384 bytes)
-    Pages free:                                    31238.
-    Pages active:                                 360529.
-    Pages inactive:                               357818.
-    Pages speculative:                              6171.
-    Pages throttled:                                   0.
-    Pages wired down:                             207477.
-    Pages purgeable:                               22817.
-    "Translation faults":                      230865869.
-    Pages copy-on-write:                         5146221.
-    File-backed pages:                            282521.
-    Anonymous pages:                              575655.
-    Pages stored in compressor:                  1163012.
-    Pages occupied by compressor:                 500656.
-    Decompressions:                              8598299.
-    Compressions:                               15014891.
-    """
-
-    func testVMStatParsesThePageCounts() {
-        let pages = VMStatParser.parse(vmStatFixture)
-
-        XCTAssertEqual(pages?.free, 31_238)
-        XCTAssertEqual(pages?.active, 360_529)
-        XCTAssertEqual(pages?.inactive, 357_818)
-        XCTAssertEqual(pages?.wired, 207_477)
-    }
-
-    /// The original code matched on the substring "compressor", which hits two lines.
-    /// The loop overwrote, so the last one won - correct only by accident, and only
-    /// as long as vm_stat keeps printing them in that order.
-    func testCompressorFigureIsPagesOccupiedNotPagesStored() {
-        let pages = VMStatParser.parse(vmStatFixture)
-
-        XCTAssertEqual(pages?.occupiedByCompressor, 500_656)
-        XCTAssertNotEqual(pages?.occupiedByCompressor, 1_163_012)
-    }
-
-    /// Same fixture, with the two compressor lines swapped. A substring match would
-    /// now pick the wrong one; an exact key match is unaffected.
-    func testCompressorFigureIsCorrectWhateverTheLineOrder() {
-        let swapped = vmStatFixture
-            .replacingOccurrences(of: "Pages stored in compressor:                  1163012.",
-                                  of2: "Pages occupied by compressor:                 500656.")
-
-        XCTAssertEqual(VMStatParser.parse(swapped)?.occupiedByCompressor, 500_656)
-    }
-
-    /// "Pages reactivated" contains the substring "active", and vm_stat prints it
-    /// after "Pages active". A substring matcher would report 33.5M reactivated
-    /// pages as active memory - 511 GB on a 24 GB machine. The same trap exists for
-    /// "Pages purgeable" versus "Pages purged". Exact key matching is what prevents
-    /// the compressor bug from having siblings.
-    func testKeysThatContainOtherKeysAreNotConfused() {
-        let fixture = vmStatFixture + "\nPages reactivated:                          33503395.\nPages purged:                                6004632."
-        let pages = VMStatParser.parse(fixture)
-
-        XCTAssertEqual(pages?.active, 360_529)
-        XCTAssertNotEqual(pages?.active, 33_503_395)
-    }
-
-    func testVMStatFailsOnEmptyOrTruncatedOutput() {
-        XCTAssertNil(VMStatParser.parse(""))
-        XCTAssertNil(VMStatParser.parse("Mach Virtual Memory Statistics: (page size of 16384 bytes)"))
-        // Header plus one line: still missing the fields we need.
-        XCTAssertNil(VMStatParser.parse("Pages free:  31238."))
-    }
-
-    func testVMStatFailsOnGarbage() {
-        XCTAssertNil(VMStatParser.parse("command not found"))
-        XCTAssertNil(VMStatParser.parse("Pages free: not-a-number."))
-    }
-
-    // MARK: - sysctl vm.swapusage
-
-    func testSwapUsageParsesUsedAndTotalInGigabytes() {
-        let fixture = "vm.swapusage: total = 10240.00M  used = 8571.12M  free = 1668.88M  (encrypted)"
-        let swap = SwapUsageParser.parse(fixture)
-
-        XCTAssertEqual(swap?.total ?? 0, 10.0, accuracy: 0.001)   // 10240 / 1024
-        XCTAssertEqual(swap?.used ?? 0, 8.3702, accuracy: 0.001)  // 8571.12 / 1024
-    }
-
-    /// "used" must not be confused with "total" or "free" - all three share the
-    /// same shape, and the used figure is the one the pressure alert keys off.
-    func testSwapUsageDoesNotConfuseUsedWithFree() {
-        let fixture = "vm.swapusage: total = 4096.00M  used = 0.00M  free = 4096.00M  (encrypted)"
-        let swap = SwapUsageParser.parse(fixture)
-
-        XCTAssertEqual(swap?.used ?? -1, 0.0)
-        XCTAssertEqual(swap?.total ?? 0, 4.0, accuracy: 0.001)
-    }
-
-    func testSwapUsageFailsOnEmptyOrMalformedOutput() {
-        XCTAssertNil(SwapUsageParser.parse(""))
-        XCTAssertNil(SwapUsageParser.parse("vm.swapusage: total = 4096.00M"))       // no used
-        XCTAssertNil(SwapUsageParser.parse("vm.swapusage: total = ?  used = ?"))
-    }
-
     // MARK: - ps
 
     /// Real output of `ps aux | sort -rk3 | head -4`, the exact pipeline the app runs.
@@ -191,14 +88,5 @@ final class LegacyShellParsersTests: XCTestCase {
         XCTAssertNil(BatteryStaticParser.parse(""))
         XCTAssertNil(BatteryStaticParser.parse("          Cycle Count: 513"))   // no condition
         XCTAssertNil(BatteryStaticParser.parse("          Condition: Normal"))  // no cycles
-    }
-}
-
-private extension String {
-    /// Swaps two substrings with each other.
-    func replacingOccurrences(of a: String, of2 b: String) -> String {
-        replacingOccurrences(of: a, with: "\u{0}TMP\u{0}")
-            .replacingOccurrences(of: b, with: a)
-            .replacingOccurrences(of: "\u{0}TMP\u{0}", with: b)
     }
 }

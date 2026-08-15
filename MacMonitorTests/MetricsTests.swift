@@ -4,7 +4,7 @@ import XCTest
 /// Tests for the pure computation layer.
 ///
 /// Each test is derived from a defect found in the 14 August read-only audit and
-/// from the behaviour the app is supposed to have — not from how the fix happens to
+/// from the behaviour the app is supposed to have - not from how the fix happens to
 /// be written. Every one of them fails against the original code; where that is not
 /// obvious, the test says so.
 final class MetricsTests: XCTestCase {

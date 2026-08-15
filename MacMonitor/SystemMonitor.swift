@@ -26,7 +26,13 @@ struct RAMUsage {
     var compressedGB: Double
     var swapUsedGB: Double
     var swapTotalGB: Double
-    var pressure: Double { totalGB > 0 ? usedGB / totalGB : 0 }
+    /// Occupancy, i.e. used over total. NOT the kernel's memory pressure level,
+    /// which is `pressureLevel` below and is a different thing entirely.
+    var occupancy: Double { totalGB > 0 ? usedGB / totalGB : 0 }
+    /// What macOS itself reports and acts on.
+    var pressureLevel: MemoryPressure = .normal
+    /// Activity Monitor's own formula, kept alongside ours so the gap is visible.
+    var activityMonitorUsedGB: Double = 0
     var history: [Double] = []         // 60 pts - 2 min live
     var longHistory: [Double] = []     // 1800 pts - 1h
 }
@@ -63,7 +69,14 @@ struct ThermalInfo {
 }
 
 struct Alert: Identifiable {
-    let id = UUID()
+    /// Stable across refreshes: an alert is identified by WHAT it is, not by when it
+    /// was rebuilt. checkAlerts runs every two seconds; with a fresh UUID each time
+    /// SwiftUI tore down and recreated every row, and the timestamp always read "now"
+    /// even for an alert that had been up for ten minutes.
+    enum Kind: String, Equatable { case cpu, swap, disk, thermal, battery }
+
+    var id: String { kind.rawValue }
+    var kind: Kind
     var message: String
     var level: AlertLevel
     var timestamp: Date
@@ -117,6 +130,12 @@ class SystemMonitor: ObservableObject {
     @Published var uptime: String = ""
     @Published var macModel: String = "MacBook Pro"
     @Published var macOS: String = ""
+    @Published var loadAverages: (one: Double, five: Double, fifteen: Double)?
+    @Published var gpu: GPUSample?
+    @Published var batteryDetail: BatteryDetail?
+    @Published var clusterLoad = NativeCPU.ClusterLoad(performance: nil, efficiency: nil)
+    @Published var diskIORate: (readBytesPerSecond: Double, writeBytesPerSecond: Double)?
+    @Published var networkRate: (inBytesPerSecond: Double, outBytesPerSecond: Double)?
     @Published var powermetricsEnabled = false
 
     private var timer: Timer?
@@ -161,6 +180,7 @@ class SystemMonitor: ObservableObject {
             group.addTask { await self.fetchBattery() }
             group.addTask { await self.fetchProcesses() }
             group.addTask { await self.fetchUptime() }
+            group.addTask { await self.fetchNewMetrics() }
         }
         checkAlerts()
     }
@@ -224,33 +244,22 @@ class SystemMonitor: ObservableObject {
     // MARK: - Memory
 
     func fetchRAM() async {
-        var totalRAM: UInt64 = 0
-        var size = MemoryLayout<UInt64>.size
-        sysctlbyname("hw.memsize", &totalRAM, &size, nil, 0)
-        let totalGB = Double(totalRAM) / 1_073_741_824
+        // Native: host_statistics64 instead of parsing vm_stat, sysctlbyname with
+        // xsw_usage instead of parsing "1234.56M" out of a string. No process spawned.
+        guard let sample = NativeMemory.sample() else { return }
 
-        let vmResult = await runShell("vm_stat")
-        guard let pages = VMStatParser.parse(vmResult) else { return }
+        let g = 1_073_741_824.0
+        let totalGB    = Double(sample.totalBytes) / g
+        let active     = Double(sample.activeBytes) / g
+        let inactive   = Double(sample.inactiveBytes) / g
+        let wired      = Double(sample.wiredBytes) / g
+        let compressed = Double(sample.compressedBytes) / g
+        let free       = totalGB - (active + inactive + wired + compressed)
+        let used       = Double(sample.usedBytes) / g
 
-        // vm_stat reports page counts, not bytes. The page size is 4 KB on Intel
-        // but 16 KB on Apple Silicon, so it is read at runtime: hardcoding 4096
-        // under-reports every memory figure by a factor of 4 on Apple Silicon.
-        let pageSize = Int(vm_page_size)
-        func gigabytes(_ p: Double) -> Double { MemoryMath.gigabytes(pages: p, pageSize: pageSize) ?? 0 }
-
-        let free       = gigabytes(pages.free)
-        let active     = gigabytes(pages.active)
-        let inactive   = gigabytes(pages.inactive)
-        let wired      = gigabytes(pages.wired)
-        let compressed = gigabytes(pages.occupiedByCompressor)
-
-        // Real used memory = active + wired + compressed (inactive is reclaimable)
-        let used = active + wired + compressed
-
-        let swapResult = await runShell("sysctl vm.swapusage")
-        let swap = SwapUsageParser.parse(swapResult)
-        let swapUsed  = swap?.used  ?? 0
-        let swapTotal = swap?.total ?? 0
+        let swapBytes = NativeMemory.swap()
+        let swapUsed  = Double(swapBytes?.usedBytes ?? 0) / g
+        let swapTotal = Double(swapBytes?.totalBytes ?? 0) / g
 
         var history = ram.history
         history.append(totalGB > 0 ? used / totalGB : 0)
@@ -260,10 +269,13 @@ class SystemMonitor: ObservableObject {
         longHistory.append(totalGB > 0 ? used / totalGB : 0)
         if longHistory.count > 1800 { longHistory.removeFirst() }
 
-        ram = RAMUsage(totalGB: totalGB, usedGB: used, freeGB: free + inactive,
+        ram = RAMUsage(totalGB: totalGB, usedGB: used, freeGB: max(free, 0),
                        activeGB: active, inactiveGB: inactive, wiredGB: wired,
                        compressedGB: compressed, swapUsedGB: swapUsed,
-                       swapTotalGB: swapTotal, history: history, longHistory: longHistory)
+                       swapTotalGB: swapTotal,
+                       pressureLevel: NativeMemory.pressure() ?? .normal,
+                       activityMonitorUsedGB: Double(sample.activityMonitorUsedBytes) / g,
+                       history: history, longHistory: longHistory)
     }
 
     // MARK: - Disk
@@ -400,6 +412,53 @@ class SystemMonitor: ObservableObject {
         processes = Array(procs.prefix(12))
     }
 
+    // MARK: - New metrics
+
+    private var lastPerCoreTicks: [CPUMath.Ticks]?
+    private var clusterTypesCache: [Character]?
+    private var lastDiskIO: (counters: DiskIOCounters, at: Date)?
+    private var lastNetwork: (counters: NetworkCounters, at: Date)?
+
+    func fetchNewMetrics() async {
+        gpu = NativeGPU.sample()
+        batteryDetail = NativeBattery.detail()
+
+        // P/E clusters. The mapping is read once: it cannot change at runtime.
+        if clusterTypesCache == nil { clusterTypesCache = NativeCPU.clusterTypes() }
+        if let types = clusterTypesCache, !types.isEmpty, let current = NativeCPU.perCoreTicks() {
+            clusterLoad = NativeCPU.clusterLoad(current: current, previous: lastPerCoreTicks, types: types)
+            lastPerCoreTicks = current
+        }
+
+        let now = Date()
+
+        if let counters = NativeDiskIO.counters() {
+            if let previous = lastDiskIO {
+                let seconds = now.timeIntervalSince(previous.at)
+                if seconds > 0.5 {
+                    diskIORate = (Double(counters.bytesRead &- previous.counters.bytesRead) / seconds,
+                                  Double(counters.bytesWritten &- previous.counters.bytesWritten) / seconds)
+                    lastDiskIO = (counters, now)
+                }
+            } else {
+                lastDiskIO = (counters, now)
+            }
+        }
+
+        if let counters = NativeNetwork.counters() {
+            if let previous = lastNetwork {
+                let seconds = now.timeIntervalSince(previous.at)
+                if seconds > 0.5 {
+                    networkRate = (Double(counters.bytesIn &- previous.counters.bytesIn) / seconds,
+                                   Double(counters.bytesWritten &- previous.counters.bytesWritten) / seconds)
+                    lastNetwork = (counters, now)
+                }
+            } else {
+                lastNetwork = (counters, now)
+            }
+        }
+    }
+
     // MARK: - Uptime
 
     func fetchUptime() async {
@@ -423,6 +482,7 @@ class SystemMonitor: ObservableObject {
         }
 
         uptime = UptimeFormatter.string(seconds: seconds) ?? "--"
+        loadAverages = NativeCPU.loadAverages()
     }
 
     // MARK: - Alerts
@@ -431,23 +491,23 @@ class SystemMonitor: ObservableObject {
         var newAlerts: [Alert] = []
 
         if cpu.total > 85 {
-            newAlerts.append(Alert(message: "CPU at \(Int(cpu.total))% - very high load", level: .warning, timestamp: Date(), icon: "cpu"))
+            newAlerts.append(Alert(kind: .cpu, message: "CPU at \(Int(cpu.total))% - very high load", level: .warning, timestamp: Date(), icon: "cpu"))
         }
         if ram.swapUsedGB > 1.5 {
-            newAlerts.append(Alert(message: "High swap (\(String(format: "%.1f", ram.swapUsedGB)) GB) - memory pressure", level: .warning, timestamp: Date(), icon: "memorychip"))
+            newAlerts.append(Alert(kind: .swap, message: "High swap (\(String(format: "%.1f", ram.swapUsedGB)) GB) - memory pressure", level: .warning, timestamp: Date(), icon: "memorychip"))
         }
         if disk.freeGB < 10 {
-            newAlerts.append(Alert(message: "Storage almost full - \(String(format: "%.1f", disk.freeGB)) GB left", level: .critical, timestamp: Date(), icon: "internaldrive"))
+            newAlerts.append(Alert(kind: .disk, message: "Storage almost full - \(String(format: "%.1f", disk.freeGB)) GB left", level: .critical, timestamp: Date(), icon: "internaldrive"))
         }
         // The app has no access to actual temperatures, so alerts report the
         // thermal state macOS publishes, never a number of degrees.
         if thermal.thermalLevel == "Critical" {
-            newAlerts.append(Alert(message: "Thermal state critical - close some apps immediately", level: .critical, timestamp: Date(), icon: "thermometer.high"))
+            newAlerts.append(Alert(kind: .thermal, message: "Thermal state critical - close some apps immediately", level: .critical, timestamp: Date(), icon: "thermometer.high"))
         } else if thermal.thermalLevel == "Serious" {
-            newAlerts.append(Alert(message: "Thermal state serious - macOS is reducing performance", level: .warning, timestamp: Date(), icon: "thermometer.medium"))
+            newAlerts.append(Alert(kind: .thermal, message: "Thermal state serious - macOS is reducing performance", level: .warning, timestamp: Date(), icon: "thermometer.medium"))
         }
         if battery.isPresent && battery.percentage < 15 && !battery.isPlugged {
-            newAlerts.append(Alert(message: "Low battery: \(battery.percentage)%", level: .critical, timestamp: Date(), icon: "battery.25"))
+            newAlerts.append(Alert(kind: .battery, message: "Low battery: \(battery.percentage)%", level: .critical, timestamp: Date(), icon: "battery.25"))
         }
 
         // Notify when a new critical alert appears
@@ -457,7 +517,20 @@ class SystemMonitor: ObservableObject {
             sendNotification(title: "Mac Monitor", body: newAlerts.first(where: { $0.level == .critical })?.message ?? "Critical alert")
         }
 
-        alerts = newAlerts
+        // Keep the timestamp of the first appearance, and only republish when the
+        // set has actually changed. Rebuilding the array every two seconds made the
+        // list flicker and reset every clock it displayed.
+        let previous = Dictionary(uniqueKeysWithValues: alerts.map { ($0.id, $0) })
+        let stamped = newAlerts.map { alert -> Alert in
+            var a = alert
+            if let existing = previous[alert.id], existing.message == alert.message {
+                a.timestamp = existing.timestamp
+            }
+            return a
+        }
+        if stamped.map(\.id) != alerts.map(\.id) || stamped.map(\.message) != alerts.map(\.message) {
+            alerts = stamped
+        }
     }
 
     // MARK: - Notifications

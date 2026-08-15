@@ -18,6 +18,7 @@
 		A009 /* Metrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F010 /* Metrics.swift */; };
 		A010 /* LegacyShellParsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F011 /* LegacyShellParsers.swift */; };
 		A011 /* CacheCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F012 /* CacheCleaner.swift */; };
+		A012 /* NativeCollectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = F013 /* NativeCollectors.swift */; };
 		TA01 /* MetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF01 /* MetricsTests.swift */; };
 		TA02 /* LegacyShellParsersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF02 /* LegacyShellParsersTests.swift */; };
 		TA03 /* CachePathValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF03 /* CachePathValidatorTests.swift */; };
@@ -46,6 +47,7 @@
 		F010 /* Metrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metrics.swift; sourceTree = "<group>"; };
 		F011 /* LegacyShellParsers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyShellParsers.swift; sourceTree = "<group>"; };
 		F012 /* CacheCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheCleaner.swift; sourceTree = "<group>"; };
+		F013 /* NativeCollectors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCollectors.swift; sourceTree = "<group>"; };
 		PROD /* MacMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MacMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		TF01 /* MetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricsTests.swift; sourceTree = "<group>"; };
 		TF02 /* LegacyShellParsersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyShellParsersTests.swift; sourceTree = "<group>"; };
@@ -95,6 +97,7 @@
 				F010 /* Metrics.swift */,
 				F011 /* LegacyShellParsers.swift */,
 				F012 /* CacheCleaner.swift */,
+				F013 /* NativeCollectors.swift */,
 			);
 			path = MacMonitor;
 			sourceTree = "<group>";
@@ -235,6 +238,7 @@
 				A009 /* Metrics.swift in Sources */,
 				A010 /* LegacyShellParsers.swift in Sources */,
 				A011 /* CacheCleaner.swift in Sources */,
+				A012 /* NativeCollectors.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

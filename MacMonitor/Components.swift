@@ -48,21 +48,21 @@ struct Sparkline: View {
     var height: CGFloat = 40
     var showAverages: Bool = true
 
-    // Moyenne glissante sur les N derniers points de longData
-    private func movingAvg(points: Int) -> [Double] {
-        guard !longData.isEmpty, points > 0 else { return [] }
-        let src = longData
-        // 60 output points, evenly spread over the whole span of src
-        let outCount = 60
-        guard src.count >= 2 else { return Array(repeating: src.last ?? 0, count: outCount) }
-
+    /// Downsamples longData to `outCount` points by averaging each bucket.
+    ///
+    /// Replaces a per-render moving average that recomputed four windows of
+    /// 1800/450/150/30 points from inside `body` - roughly 146 000 additions per
+    /// sparkline per render, on the main thread, memoised nowhere. One pass gives the
+    /// same visual result for a fraction of the work.
+    private func downsampled(_ source: [Double], into outCount: Int) -> [Double] {
+        guard outCount > 0 else { return [] }
+        guard source.count > outCount else { return source }
+        let bucket = Double(source.count) / Double(outCount)
         return (0..<outCount).map { i in
-            // Position dans src correspondant au point i
-            let pos = Int(Double(i) / Double(outCount - 1) * Double(src.count - 1))
-            let start = max(0, pos - points / 2)
-            let end   = min(src.count, pos + points / 2)
-            let slice = src[start..<end]
-            return slice.isEmpty ? 0 : slice.reduce(0, +) / Double(slice.count)
+            let lower = Int(Double(i) * bucket)
+            let upper = min(source.count, max(lower + 1, Int(Double(i + 1) * bucket)))
+            let slice = source[lower..<upper]
+            return slice.reduce(0, +) / Double(slice.count)
         }
     }
 
@@ -104,13 +104,7 @@ struct Sparkline: View {
             let globalMax = allData.max() ?? 1
             let safeMax   = globalMax < 0.01 ? 1.0 : globalMax
 
-            // Moving averages, oldest to newest = most transparent to most opaque
-            let avgConfigs: [(pts: Int, opacity: Double, width: CGFloat)] = [
-                (1800, 0.20, 1.0),   // h1
-                (450,  0.30, 1.0),   // m15
-                (150,  0.40, 1.2),   // m5
-                (30,   0.55, 1.4),   // m1
-            ]
+            let trend = showAverages && longData.count > 30 ? downsampled(longData, into: 60) : []
 
             ZStack {
                 // Remplissage live (fond)
@@ -120,16 +114,10 @@ struct Sparkline: View {
                         startPoint: .top, endPoint: .bottom
                     ))
 
-                // Courbes moyennes glissantes (si longData dispo)
-                if showAverages && longData.count > 30 {
-                    ForEach(avgConfigs.indices, id: \.self) { idx in
-                        let cfg = avgConfigs[idx]
-                        makePath(data: movingAvg(points: cfg.pts), in: geo, safeMax: safeMax)
-                            .stroke(
-                                color.opacity(cfg.opacity),
-                                style: StrokeStyle(lineWidth: cfg.width, lineCap: .round, lineJoin: .round)
-                            )
-                    }
+                if !trend.isEmpty {
+                    makePath(data: trend, in: geo, safeMax: safeMax)
+                        .stroke(color.opacity(0.35),
+                                style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
                 }
 
                 // Live curve - the most visible one
@@ -147,11 +135,8 @@ struct SparklineLegend: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            LegendItem(color: color, opacity: 1.0,  width: 2.0, label: "Live")
-            LegendItem(color: color, opacity: 0.55, width: 1.4, label: "m1")
-            LegendItem(color: color, opacity: 0.40, width: 1.2, label: "m5")
-            LegendItem(color: color, opacity: 0.30, width: 1.0, label: "m15")
-            LegendItem(color: color, opacity: 0.20, width: 1.0, label: "1h")
+            LegendItem(color: color, opacity: 1.0,  width: 2.0, label: "Live, 2 min")
+            LegendItem(color: color, opacity: 0.35, width: 1.2, label: "Trend, 1 h")
         }
     }
 }
@@ -268,6 +253,14 @@ extension Color {
 }
 
 // MARK: - Size formatters
+
+/// Formats a throughput in bytes per second.
+func formatRate(_ bytesPerSecond: Double) -> String {
+    let b = max(bytesPerSecond, 0)
+    if b >= 1_000_000 { return String(format: "%.1f MB/s", b / 1_000_000) }
+    if b >= 1_000 { return String(format: "%.0f KB/s", b / 1_000) }
+    return "0 KB/s"
+}
 
 /// Formats a value already expressed in BINARY gigabytes (2^30). Use for memory,
 /// which is what the hardware and the kernel report.

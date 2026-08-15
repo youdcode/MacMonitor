@@ -37,6 +37,33 @@ struct CPURAMView: View {
                         }
                         
                         ProgressBar(value: monitor.cpu.total / 100, color: .statusColor(for: monitor.cpu.total / 100))
+
+                        Divider()
+
+                        HStack(spacing: 24) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Cores")
+                                    .font(.caption).fontWeight(.medium)
+                                if let p = monitor.clusterLoad.performance {
+                                    MetricRow(label: "Performance", value: String(format: "%.0f%%", p))
+                                }
+                                if let e = monitor.clusterLoad.efficiency {
+                                    MetricRow(label: "Efficiency", value: String(format: "%.0f%%", e))
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Load average")
+                                    .font(.caption).fontWeight(.medium)
+                                if let l = monitor.loadAverages {
+                                    MetricRow(label: "1 min", value: String(format: "%.2f", l.one))
+                                    MetricRow(label: "5 min", value: String(format: "%.2f", l.five))
+                                    MetricRow(label: "15 min", value: String(format: "%.2f", l.fifteen))
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 }
                 
@@ -66,7 +93,21 @@ struct CPURAMView: View {
                             .frame(width: 200)
                         }
                         
-                        ProgressBar(value: monitor.ram.pressure, color: .statusColor(for: monitor.ram.pressure))
+                        ProgressBar(value: monitor.ram.occupancy, color: .statusColor(for: monitor.ram.occupancy))
+
+                        HStack {
+                            Text("Memory pressure")
+                                .font(.caption).foregroundColor(.secondary)
+                            Text(monitor.ram.pressureLevel.label)
+                                .font(.caption).fontWeight(.semibold)
+                                .foregroundColor(monitor.ram.pressureLevel == .normal ? .green :
+                                                 monitor.ram.pressureLevel == .warning ? .orange : .red)
+                            Text("reported by the kernel, not an occupancy ratio")
+                                .font(.caption2).foregroundColor(.secondary)
+                            Spacer()
+                            Text("Activity Monitor counts \(formatMemoryGB(monitor.ram.activityMonitorUsedGB))")
+                                .font(.caption2).foregroundColor(.secondary)
+                        }
                         
                         Divider()
                         
@@ -150,6 +191,13 @@ struct DiskView: View {
                             height: 10
                         )
                         
+                        if let io = monitor.diskIORate {
+                            HStack(spacing: 16) {
+                                MetricRow(label: "Read", value: "\(formatRate(io.readBytesPerSecond))")
+                                MetricRow(label: "Write", value: "\(formatRate(io.writeBytesPerSecond))")
+                            }
+                        }
+
                         Text("\(Int(monitor.disk.usedPercent * 100))% used")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -215,6 +263,18 @@ struct BatteryView: View {
                                     MetricRow(label: "Time remaining", value: monitor.battery.timeRemaining)
                                     MetricRow(label: "Cycles", value: "\(monitor.battery.cycleCount)",
                                               color: monitor.battery.cycleCount > 800 ? .orange : .primary)
+                                    if let d = monitor.batteryDetail {
+                                        if let t = d.temperature {
+                                            MetricRow(label: "Temperature", value: String(format: "%.1f C", t))
+                                        }
+                                        if let p = d.power, abs(p) > 0.05 {
+                                            MetricRow(label: "Power", value: String(format: "%.1f W", p))
+                                        }
+                                        if let r = d.fullChargeRatio, let raw = d.rawMaxCapacity, let design = d.designCapacity {
+                                            MetricRow(label: "Full-charge capacity",
+                                                      value: "\(raw) / \(design) mAh - \(Int(r * 100))%")
+                                        }
+                                    }
                                     MetricRow(label: "Condition", value: monitor.battery.health,
                                               color: monitor.battery.health == "Normal" ? .green : .orange)
                                 }
