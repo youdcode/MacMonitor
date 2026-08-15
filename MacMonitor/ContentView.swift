@@ -37,6 +37,7 @@ enum Tab: String, CaseIterable, Identifiable {
 struct ContentView: View {
     @StateObject private var monitor = SystemMonitor()
     @State private var selection: Tab = .overview
+    @Environment(\.controlActiveState) private var controlActiveState
 
     var body: some View {
         NavigationSplitView {
@@ -90,7 +91,40 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onAppear { monitor.startMonitoring() }
+        // Only the visible screen's detail is collected. Everything else stays on the
+        // permanent set that Overview and the alerts need.
+        .onChange(of: selection) { newValue in
+            monitor.setVisibleScope(newValue.scope)
+        }
+        // Suspended when the window is not frontmost, resumed when it comes back.
+        // startMonitoring is idempotent, and onAppear calls it: stopMonitoring used to
+        // be a one-way door with nothing to reopen it.
+        .onChange(of: controlActiveState) { state in
+            switch state {
+            case .key, .active: monitor.resume()
+            default: monitor.suspend()
+            }
+        }
+        .onAppear {
+            monitor.setVisibleScope(selection.scope)
+            monitor.startMonitoring()
+        }
         .onDisappear { monitor.stopMonitoring() }
+    }
+}
+
+extension Tab {
+    /// What each screen needs beyond the permanent set.
+    var scope: CollectionScope {
+        switch self {
+        case .overview: return .none
+        case .processor: return .processor
+        case .memory: return .none          // the permanent set already covers memory
+        case .storage: return .storage
+        case .network: return .network
+        case .battery: return .battery
+        case .processes: return .none       // processes are in the permanent set
+        case .cleaner: return .none
+        }
     }
 }

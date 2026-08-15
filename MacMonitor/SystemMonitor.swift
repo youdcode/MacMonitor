@@ -110,6 +110,22 @@ struct CacheItem: Identifiable {
     var sizeGB: Double { Double(sizeBytes) / 1_073_741_824 }
 }
 
+/// What the visible screen needs on top of the permanent set.
+///
+/// The permanent set is whatever Overview and checkAlerts read: CPU, memory, storage
+/// capacity, battery charge, the process list and uptime. Everything else - GPU,
+/// cluster split, disk throughput, network throughput, battery sensors - is collected
+/// only while the screen that shows it is on screen. Collecting all of it every two
+/// seconds for numbers nobody is looking at is exactly the load a monitoring app
+/// should not be adding.
+enum CollectionScope: Equatable {
+    case none
+    case processor      // GPU, P/E clusters
+    case storage        // disk read/write rates
+    case network        // throughput
+    case battery        // temperature, power, capacity
+}
+
 // MARK: - SystemMonitor
 
 @MainActor
@@ -153,6 +169,12 @@ class SystemMonitor: ObservableObject {
             timers.removeAll()
         }
     }
+
+    /// What the visible screen adds to the permanent set.
+    private var visibleScope: CollectionScope = .none
+    /// Set while the window is not frontmost. Timers are torn down rather than left
+    /// firing into a no-op.
+    private(set) var isSuspended = false
 
     private let timerBox = TimerBox()
     private var timer: Timer?
@@ -207,20 +229,55 @@ class SystemMonitor: ObservableObject {
         await fetchBattery()
         await fetchProcesses()
         await fetchUptime()
-        await fetchAllDetail()
+        await fetchScopedDetail()
         checkAlerts()
     }
 
-    /// Every detail metric, every cycle. Narrowed to the visible screen in the next
-    /// commit; kept whole here so this one is a pure interface change.
-    private func fetchAllDetail() async {
-        gpu = NativeGPU.sample()
-        batteryDetail = NativeBattery.detail()
-        updateClusterLoad()
-        updateDiskIORate()
-        updateNetworkRate()
+    /// Collected only while the screen that shows it is visible.
+    private func fetchScopedDetail() async {
+        switch visibleScope {
+        case .none:
+            break
+        case .processor:
+            gpu = NativeGPU.sample()
+            updateClusterLoad()
+        case .storage:
+            updateDiskIORate()
+        case .network:
+            updateNetworkRate()
+        case .battery:
+            batteryDetail = NativeBattery.detail()
+        }
     }
 
+    /// Called by the view when the selected screen changes.
+    ///
+    /// Clears the previous screen's readings so a stale number cannot be shown as if
+    /// it were live when the user comes back to it.
+    func setVisibleScope(_ scope: CollectionScope) {
+        guard scope != visibleScope else { return }
+        visibleScope = scope
+        if scope != .processor { gpu = nil }
+        if scope != .storage { diskIORate = nil; lastDiskIO = nil }
+        if scope != .network { networkRate = nil; lastNetwork = nil }
+        Task { await self.fetchScopedDetail() }
+    }
+
+    /// Window is no longer frontmost: stop collecting entirely.
+    func suspend() {
+        guard !isSuspended else { return }
+        isSuspended = true
+        timerBox.invalidateAll()
+        timer = nil
+        thermalTimer = nil
+    }
+
+    /// Window is frontmost again.
+    func resume() {
+        guard isSuspended else { return }
+        isSuspended = false
+        startMonitoring()
+    }
 
     // MARK: - Static Info
 
