@@ -107,7 +107,7 @@ struct Sparkline: View {
             let trend = showAverages && longData.count > 30 ? downsampled(longData, into: 60) : []
 
             ZStack {
-                // Remplissage live (fond)
+                // Live fill, behind everything else
                 makeFill(data: data, in: geo, safeMax: safeMax)
                     .fill(LinearGradient(
                         colors: [color.opacity(0.18), color.opacity(0.02)],
