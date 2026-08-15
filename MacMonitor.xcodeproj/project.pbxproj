@@ -16,6 +16,7 @@
 		A009 /* Metrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F010 /* Metrics.swift */; };
 		A010 /* LegacyShellParsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F011 /* LegacyShellParsers.swift */; };
 		A011 /* CacheCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F012 /* CacheCleaner.swift */; };
+		AASS /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FASS /* Assets.xcassets */; };
 		A012 /* NativeCollectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = F013 /* NativeCollectors.swift */; };
 		TA01 /* MetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF01 /* MetricsTests.swift */; };
 		TA02 /* LegacyShellParsersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF02 /* LegacyShellParsersTests.swift */; };
@@ -51,6 +52,7 @@
 		F010 /* Metrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metrics.swift; sourceTree = "<group>"; };
 		F011 /* LegacyShellParsers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyShellParsers.swift; sourceTree = "<group>"; };
 		F012 /* CacheCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheCleaner.swift; sourceTree = "<group>"; };
+		FASS /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F013 /* NativeCollectors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCollectors.swift; sourceTree = "<group>"; };
 		PROD /* MacMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MacMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		TF01 /* MetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricsTests.swift; sourceTree = "<group>"; };
@@ -107,6 +109,7 @@
 				F010 /* Metrics.swift */,
 				F011 /* LegacyShellParsers.swift */,
 				F012 /* CacheCleaner.swift */,
+				FASS /* Assets.xcassets */,
 				F013 /* NativeCollectors.swift */,
 				F020 /* DesignSystem.swift */,
 				F021 /* DetailScreen.swift */,
@@ -228,6 +231,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AASS /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -397,6 +401,8 @@
 		BC03 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -419,6 +425,8 @@
 		BC04 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
