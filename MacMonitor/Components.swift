@@ -58,6 +58,169 @@ struct RingGauge: View {
     }
 }
 
+// MARK: - Speed dial
+
+/// A dial for a measured link capacity, on the logarithmic scale in GaugeScale.
+///
+/// Deliberately not a RingGauge. A ring runs 0 to 100 % and closes; this runs 1 to
+/// 1000 Mbit/s on a logarithmic scale and has two stops, which is a different thing and
+/// has to look like one.
+///
+/// The colour is the screen's accent, not a verdict. Whether a speed is good is said in
+/// words and a symbol underneath, by the caller, because a coloured arc on its own
+/// tells a colour-blind reader nothing - the same rule that put a shape on every status
+/// in this application.
+struct SpeedGauge: View {
+
+    /// nil until this direction has been measured. An empty dial reading zero would be
+    /// a statement, and a false one: not measured and measured at zero are not the same
+    /// thing, so the middle shows a dash and the needle is absent.
+    var megabitsPerSecond: Double?
+    var caption: String
+    /// Spoken by VoiceOver in place of the drawing. "Download capacity", say.
+    var accessibilityName: String
+    var colour: Color
+    var size: CGFloat = 152
+
+    /// Degrees of travel, and where the left stop sits, measured clockwise from twelve
+    /// o'clock. 225 + 270 = 495, which is 135: the two stops sit at half past four and
+    /// half past seven, leaving the bottom ninety degrees open for the readout.
+    private let sweep: Double = 270
+    private let zeroAngle: Double = 225
+
+    // Radii, as fractions of the dial's width. The arc sits inside the ticks, the ticks
+    // inside the labels, and the readout inside all of it.
+    private var arcRadius: CGFloat { size * 0.330 }
+    private var arcWidth: CGFloat { size * 0.050 }
+    private var tickInner: CGFloat { size * 0.368 }
+    private var labelRadius: CGFloat { size * 0.462 }
+
+    private var fraction: Double {
+        guard let value = megabitsPerSecond else { return 0 }
+        return GaugeScale.fraction(forMegabitsPerSecond: value)
+    }
+
+    private func angle(for value: Double) -> Double {
+        zeroAngle + sweep * GaugeScale.fraction(forMegabitsPerSecond: value)
+    }
+
+    /// Three significant figures at most, and never more than four characters, so the
+    /// readout does not resize as the needle climbs during a test.
+    private var reading: String {
+        guard let value = megabitsPerSecond else { return "—" }
+        if value >= 100 { return String(format: "%.0f", value) }
+        if value >= 10 { return String(format: "%.1f", value) }
+        return String(format: "%.2f", value)
+    }
+
+    private var spokenValue: String {
+        guard megabitsPerSecond != nil else { return "not measured" }
+        return "\(reading) megabits per second"
+    }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ZStack {
+                track
+                if megabitsPerSecond != nil { value }
+                ticks
+                tickLabels
+                if megabitsPerSecond != nil { marker }
+                readout
+            }
+            .frame(width: size, height: size)
+
+            Text(caption)
+                .font(.caption)
+                .fontWeight(.medium)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityName)
+        .accessibilityValue(spokenValue)
+    }
+
+    // MARK: - Parts
+
+    private var track: some View {
+        Circle()
+            .trim(from: 0, to: sweep / 360)
+            .stroke(Color.primary.opacity(0.10), style: StrokeStyle(lineWidth: arcWidth, lineCap: .round))
+            .frame(width: arcRadius * 2, height: arcRadius * 2)
+            .rotationEffect(.degrees(zeroAngle - 90))
+    }
+
+    private var value: some View {
+        Circle()
+            .trim(from: 0, to: (sweep / 360) * fraction)
+            .stroke(colour, style: StrokeStyle(lineWidth: arcWidth, lineCap: .round))
+            .frame(width: arcRadius * 2, height: arcRadius * 2)
+            .rotationEffect(.degrees(zeroAngle - 90))
+            .animation(.easeOut(duration: 0.25), value: fraction)
+    }
+
+    private var ticks: some View {
+        ZStack {
+            ForEach(GaugeScale.majorTicks, id: \.self) { tick(at: $0, length: size * 0.048, width: 1.6) }
+            ForEach(GaugeScale.minorTicks, id: \.self) { tick(at: $0, length: size * 0.028, width: 1) }
+        }
+    }
+
+    /// Offset, then rotate. The offset moves the drawing without moving the layout
+    /// frame, so the rotation still turns about the centre of the dial and the mark
+    /// orbits it.
+    private func tick(at value: Double, length: CGFloat, width: CGFloat) -> some View {
+        Capsule()
+            .fill(Color.secondary.opacity(0.5))
+            .frame(width: width, height: length)
+            .offset(y: -(tickInner + length / 2))
+            .rotationEffect(.degrees(angle(for: value)))
+    }
+
+    private var tickLabels: some View {
+        ZStack {
+            ForEach(GaugeScale.majorTicks, id: \.self) { value in
+                Text(GaugeScale.label(forTick: value))
+                    // Proportional to the dial rather than to the text size setting, for
+                    // the reason written on the RingGauge: these have to fit between the
+                    // ticks of a circle of known diameter, and Dynamic Type would push
+                    // them across it. The caption below the dial does scale, and the
+                    // reading is available to VoiceOver.
+                    .font(.system(size: size * 0.072, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .monospacedDigit()
+                    // Undo the placement rotation so the numbers stay upright.
+                    .rotationEffect(.degrees(-angle(for: value)))
+                    .offset(y: -labelRadius)
+                    .rotationEffect(.degrees(angle(for: value)))
+            }
+        }
+    }
+
+    private var marker: some View {
+        Capsule()
+            .fill(Color.primary.opacity(0.85))
+            .frame(width: size * 0.014, height: arcWidth + size * 0.030)
+            .offset(y: -arcRadius)
+            .rotationEffect(.degrees(zeroAngle + sweep * fraction))
+            .animation(.easeOut(duration: 0.25), value: fraction)
+    }
+
+    private var readout: some View {
+        VStack(spacing: 0) {
+            Text(reading)
+                .font(.system(size: size * 0.200, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+            Text("Mbit/s")
+                .font(.system(size: size * 0.082, weight: .medium, design: .rounded))
+                .foregroundColor(.secondary)
+        }
+        // The needle never enters the bottom ninety degrees, which is where the two
+        // stops leave the dial open, so the readout can sit slightly low without ever
+        // being crossed.
+        .offset(y: size * 0.045)
+    }
+}
+
 // MARK: - Sparkline
 
 struct Sparkline: View {
