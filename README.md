@@ -6,7 +6,26 @@ and then finished properly.
 It is a window with a sidebar, not a menu bar app, and it tries to be right rather
 than complete. Where a value could not be measured honestly, it is not shown.
 
-![Overview](docs/images/overview.png)
+![The Overview screen](docs/images/overview-light.png)
+
+<details>
+<summary>The other screens, and all four in dark</summary>
+
+![The Processor screen](docs/images/processor-light.png)
+![The Network screen, after a capacity test](docs/images/network-light.png)
+![The Cleaner screen](docs/images/cleaner-light.png)
+
+Dark: [Overview](docs/images/overview-dark.png) ·
+[Processor](docs/images/processor-dark.png) ·
+[Network](docs/images/network-dark.png) ·
+[Cleaner](docs/images/cleaner-dark.png)
+
+</details>
+
+Every reading in those is live, from this machine, at the moment of the capture. The
+Network screen shows a real ndt7 run against `mlab1-par08` — 688 Mbit/s, 860 MB
+transferred — beside a current throughput of 1 kB/s, which is the pair of numbers this
+README spends a section on.
 
 ## What it measures
 
