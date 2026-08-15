@@ -227,7 +227,11 @@ class SystemMonitor: ObservableObject {
 
         let vmResult = await runShell("vm_stat")
         var free = 0.0, active = 0.0, inactive = 0.0, wired = 0.0, compressed = 0.0
-        let gb = 4096.0 / 1_073_741_824
+
+        // vm_stat reports page counts, not bytes. The page size is 4 KB on Intel
+        // but 16 KB on Apple Silicon, so it must be read at runtime: hardcoding
+        // 4096 under-reports every memory figure by a factor of 4 on Apple Silicon.
+        let gb = Double(vm_page_size) / 1_073_741_824
 
         for line in vmResult.components(separatedBy: "\n") {
             let parts = line.components(separatedBy: ":")
