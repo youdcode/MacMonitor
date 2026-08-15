@@ -37,7 +37,7 @@ struct CleanerView: View {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "info.circle")
                         .foregroundColor(.secondary)
-                    Text("These folders are caches. Applications rebuild them as they go, so removing one costs disk activity and a slower first launch, not data. Some of them still hold things you may care about, and only you know which. Read the paths before you select. Items are moved to the Trash, so a wrong choice can be undone until you empty it.")
+                    Text("These folders are caches. Applications rebuild them as they go, so removing one costs disk activity and a slower first launch, not data. Some of them still hold things you may care about, and only you know which. Read the paths before you select.")
                         .font(.callout)
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -112,6 +112,12 @@ struct CleanerView: View {
                             }
 
                             Spacer()
+
+                            Text("Items are moved to the Trash, so a wrong choice can be undone until you empty it.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: 260, alignment: .trailing)
+                                .fixedSize(horizontal: false, vertical: true)
 
                             Button("Preview") {
                                 monitor.cleanSelectedCaches(dryRun: true)
