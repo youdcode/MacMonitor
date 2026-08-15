@@ -62,9 +62,10 @@ enum SpeedTestFacts {
     /// machine but one.
     ///
     /// Verified against every run measured while building this, rate against bytes for
-    /// the same run: 226 Mbit/s moved 285 MB, 263 moved 335, 312 moved 390, 316 moved
-    /// 395, 674 moved 885, 688 moved 860. The 674 run lasted ten and a half seconds
-    /// rather than ten, which is where its extra five per cent comes from.
+    /// the same run: 226 Mbit/s moved 285 MB, 254 moved 318, 263 moved 335, 312 moved
+    /// 390, 316 moved 395, 350 moved 437, 399 moved 503, 521 moved 652, 674 moved 885,
+    /// 688 moved 860. Every one lands within two per cent of the rule except the 674
+    /// run, which lasted ten and a half seconds rather than ten.
     static let megabytesPerMegabitPerSecond = 1.25
 
     /// One complete run through this application, on the machine it was written on:

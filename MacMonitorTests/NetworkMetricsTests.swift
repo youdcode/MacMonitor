@@ -45,20 +45,24 @@ final class NetworkMetricsTests: XCTestCase {
     /// scales. Checked against every complete run measured while building this, rate
     /// against bytes for the same run.
     ///
-    /// Five per cent of slack, and it is spent almost entirely on one run: the 674
-    /// Mbit/s one lasted 10.5 seconds rather than 10, so it moved five per cent more
-    /// than the rule predicts. The other three land within one per cent.
+    /// Five per cent of slack, and one run spends almost all of it: the 674 Mbit/s one
+    /// lasted 10.5 seconds rather than 10, so it moved five per cent more than the rule
+    /// predicts. The other nine land within two per cent.
     ///
     /// This bites if the ten seconds ever changes. Halve the duration and 1.25 becomes
     /// 0.625, and every line here fails.
     func testTheStatedRuleReproducesEveryRunThatWasMeasured() {
         let runs: [(mbps: Double, megabytes: Double)] = [
-            (226, 285),   // upload, ten seconds
-            (263, 335),   // upload, through this application
-            (312, 390),   // download, ten seconds
+            (226, 285),   // upload,   harness
+            (254, 318),   // upload,   through this application
+            (263, 335),   // upload,   through this application
+            (312, 390),   // download, harness
             (316, 395),   // download, through this application
-            (674, 885),   // download, ten and a half seconds
-            (688, 860),   // download, ten seconds
+            (350, 437),   // download, through this application
+            (399, 503),   // upload,   through this application
+            (521, 652),   // download, through this application
+            (674, 885),   // download, and it ran ten and a half seconds
+            (688, 860),   // download, an earlier build
         ]
         for run in runs {
             let predicted = run.mbps * SpeedTestFacts.megabytesPerMegabitPerSecond

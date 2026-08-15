@@ -63,7 +63,7 @@ struct NetworkView: View {
             // is the whole decision. And stated as a rule rather than a single number,
             // because the test fills the link for ten seconds each way and so costs
             // whatever the link can carry.
-            Text("The test fills the link for ten seconds in each direction, so it moves about \(SpeedTestFacts.megabytesPerMegabitPerSecond, specifier: "%.2f") MB for every Mbit/s your connection carries - each way. On the machine this was written on that came to \(SpeedTestFacts.measuredDownloadMegabytes) MB down and \(SpeedTestFacts.measuredUploadMegabytes) MB up. It runs the ndt7 test against M-Lab servers, only when you start it, and never on its own.")
+            Text("The test fills the link for ten seconds in each direction, so it moves about \(SpeedTestFacts.megabytesPerMegabitPerSecond, specifier: "%.2f") MB for every Mbit/s your connection carries - each way. One run on the machine this was written on moved \(SpeedTestFacts.measuredDownloadMegabytes) MB down and \(SpeedTestFacts.measuredUploadMegabytes) MB up. It runs the ndt7 test against M-Lab servers, only when you start it, and never on its own.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -189,6 +189,9 @@ struct NetworkView: View {
                         MetricRow(label: "Measured", value: result.finishedAt.formatted(date: .omitted, time: .standard))
                         MetricRow(label: "Downloaded", value: Format.bytes(Int64(result.downloadBytes)))
                         MetricRow(label: "Uploaded", value: Format.bytes(Int64(result.uploadBytes)))
+                        // The one that matters on a metered connection, spelled out
+                        // rather than left as an addition for the reader to do.
+                        MetricRow(label: "Total moved", value: Format.bytes(Int64(result.totalBytes)))
                         MetricRow(label: "Server", value: result.server.components(separatedBy: ".").first ?? result.server)
                     }
                     .frame(width: 210)
