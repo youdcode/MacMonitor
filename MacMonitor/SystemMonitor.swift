@@ -138,6 +138,13 @@ class SystemMonitor: ObservableObject {
     @Published var thermal = ThermalInfo(thermalLevelValue: 0, thermalLevel: "Nominal", thermalDescription: "Loading...", history: Array(repeating: 0, count: 60))
     @Published var processes: [AppProcess] = []
     @Published var caches: [CacheItem] = []
+    /// True while discoverCaches is walking the cache tree.
+    ///
+    /// Without it the Cleaner screen showed "No cache above 10 MB" from launch until
+    /// the walk returned, which took over four minutes on the machine this was found
+    /// on, and read as a finished answer rather than an unstarted one. An empty result
+    /// and an unfinished scan are not the same statement.
+    @Published var isScanningCaches = false
     @Published var alerts: [Alert] = []
     @Published var isCleaning = false
     @Published var lastReport: CacheRemovalReport?
@@ -650,11 +657,14 @@ class SystemMonitor: ObservableObject {
     }
 
     func fetchCaches() async {
+        guard !isScanningCaches else { return }   // one walk at a time
         let running = Self.runningApplicationsByBundleID()
+        isScanningCaches = true
         let discovered = await Task.detached(priority: .utility) {
             Self.discoverCaches(running: running)
         }.value
         caches = discovered
+        isScanningCaches = false
     }
 
     /// Bundle identifier -> localised app name, for applications running right now.

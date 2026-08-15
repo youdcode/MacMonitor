@@ -31,6 +31,7 @@ struct CleanerView: View {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(.bordered)
+                    .disabled(monitor.isScanningCaches)
                 }
 
                 // Always on the page, never a dismissible sheet.
@@ -50,7 +51,24 @@ struct CleanerView: View {
                     CleanupReportCard(report: report)
                 }
 
-                if monitor.caches.isEmpty {
+                if monitor.isScanningCaches {
+                    // Distinct from the empty result below. Walking the cache tree took
+                    // over four minutes on the machine this was written on, and for all
+                    // of it the screen used to claim there was nothing to find.
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Measuring the cache directories...")
+                            .font(.title3)
+                            .fontWeight(.medium)
+                        Text("Every file under each one is added up, which takes a while the first time.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(40)
+                    .accessibilityElement(children: .combine)
+                } else if monitor.caches.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.largeTitle)
