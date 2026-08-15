@@ -231,11 +231,23 @@ The first attempt at that mutation proved nothing either — it modelled the bug
 `Dictionary`, whose order is undefined, where the original was an ordered loop in which
 the last match wins. It had to be replayed faithfully before it detected anything.
 
-Running them prints two linker warnings, and they are expected. The XCTest that ships
-with Xcode 26.6 is built for macOS 14 — `otool -l` on it reads `minos 14.0` — while the
-test bundle is declared for macOS 13 like everything else here, because 13 is what the
-test code needs. Declaring 14 would silence the warnings by stating a property of one
-toolchain as a property of this repository.
+A clean run prints exactly two linker warnings, and these are the two:
+
+```
+ld: warning: building for macOS-13.0, but linking with dylib '@rpath/XCTest.framework/Versions/A/XCTest' which was built for newer version 14.0
+ld: warning: building for macOS-13.0, but linking with dylib '@rpath/libXCTestSwiftSupport.dylib' which was built for newer version 14.0
+```
+
+The XCTest that ships with Xcode 26.6 is built for macOS 14 — `otool -l` on it reads
+`minos 14.0` — while the test bundle is declared for macOS 13 like everything else
+here, because 13 is what the test code needs. Declaring 14 would silence them by
+stating a property of one toolchain as a property of this repository.
+
+The gate here has never been *no warnings*, it is *no unexplained warning*, and that
+now means these two and nothing else. **A third warning of any kind is a defect, not a
+fact about Xcode.** CI counts the linker warnings after the test step and fails above
+two, so a new one cannot arrive quietly in a log nobody reads to the end. An
+incremental run prints none of them, because the linker does not run at all.
 
 ## Known gaps
 

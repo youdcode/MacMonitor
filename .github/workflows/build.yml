@@ -36,4 +36,36 @@ jobs:
         run: xcodebuild build -scheme MacMonitor -destination 'platform=macOS' -derivedDataPath .build
 
       - name: Test
-        run: xcodebuild test -scheme MacMonitor -destination 'platform=macOS' -derivedDataPath .build
+        # set -o pipefail before the pipe, so a failing xcodebuild is not swallowed by a
+        # succeeding tee. The log is kept for the step below, and still printed here.
+        run: |
+          set -o pipefail
+          xcodebuild test -scheme MacMonitor -destination 'platform=macOS' -derivedDataPath .build 2>&1 | tee test.log
+
+      # The gate is not "no warnings", it is "these two, and no others". Two linker
+      # warnings are expected and explained in the README: the XCTest shipped with Xcode
+      # is built for macOS 14 while the test bundle is declared for 13, which is what its
+      # code actually needs. A third one would be a real defect, and without this step it
+      # would arrive quietly in a log nobody reads to the end.
+      #
+      # Measured before being trusted, on the machine this was written on: a clean run
+      # prints the two lines once each, with no duplication and no context lines around
+      # them, twice in a row; an incremental run prints none, because the linker does not
+      # run at all. Both cases sit under the limit, so the step only speaks up when the
+      # count grows.
+      #
+      # Two limits, stated rather than papered over. It catches a THIRD warning, not a
+      # substituted one - two different ld warnings would still count two, which is why
+      # the step prints them for a human to read. And if Apple ever changes the
+      # "ld: warning:" prefix, the count falls to zero and this quietly stops guarding
+      # rather than failing at random, which is the safer of the two directions to break
+      # in but is still a way of breaking.
+      - name: Two linker warnings, and no others
+        run: |
+          count=$(grep -c 'ld: warning:' test.log || true)
+          echo "linker warnings: $count"
+          grep 'ld: warning:' test.log || true
+          if [ "$count" -gt 2 ]; then
+            echo "::error::$count linker warnings. Two are expected, from XCTest being built for macOS 14; anything beyond them is a defect, not a fact about Xcode."
+            exit 1
+          fi
