@@ -211,7 +211,7 @@ Nothing failed. No exception, no `nil`, no warning; just a plausible number of
 gigabytes that fitted comfortably inside the machine. The page size is now read at
 runtime and the conversion is covered by tests.
 
-Seven other defects of the same shape, each with the command that caught it, are in
+Eight other defects of the same shape, each with the command that caught it, are in
 [docs/plausible-and-wrong.md](docs/plausible-and-wrong.md). The last of them was found
 after that document was finished and this README was committed, by looking at a
 screenshot: the *Since boot* network total read 3.4 GB where `netstat -ib` read 12.0 GB,

@@ -1,4 +1,4 @@
-# Eight ways a monitor lies without erroring
+# Nine ways a monitor lies without erroring
 
 Everything below was measured on one machine: a `Mac16,8` running macOS 26.5
 (build 25F71). Commands are quoted with their real output.
@@ -12,10 +12,15 @@ right range, and the interface displayed it without hesitation. The test suite w
 green throughout, because the tests did not exist yet — and when they did exist, they
 were green too, because they tested the same wrong assumption the code did.
 
-What caught every single one was the same thing: taking the number the application
-produced and comparing it against an independent reference before believing it.
-`top` for memory. `uptime` for uptime. `netstat -ib` for the network. `ioreg` for the
-sensors. Not a better test — a second opinion.
+What caught most of them was the same thing: taking the number the application produced
+and comparing it against an independent reference before believing it. `top` for
+memory. `uptime` for uptime. `netstat -ib` for the network. `ioreg` for the sensors.
+Not a better test — a second opinion.
+
+Two resisted even that, and they are the last two here. One was a pair of correct
+numbers compared as though they measured the same thing. The other was a correct number
+that described the machine it came from rather than anything it was printed beside, and
+no second opinion would have found it, because every second opinion agreed.
 
 ---
 
@@ -181,6 +186,8 @@ The fix was editorial, not technical: label the reading as *current throughput* 
 it is read, put capacity in its own card behind a button that says what it will
 consume, and never compute one from the other.
 
+That last clause — *a button that says what it will consume* — is case 9.
+
 ## 8. The one found after this document was finished
 
 The seven above were the audit. This one turned up afterwards, while taking the
@@ -227,12 +234,76 @@ perfectly. And the comment asserting the counters were 64-bit was written by som
 who had read the header, not measured the value — which is the same mistake as trusting
 a test that was written by reading the implementation.
 
+## 9. The warning that was true for its author and false for everyone else
+
+Above the button that starts the speed test, the screen said:
+
+```
+This test downloads about 885 MB.
+```
+
+That figure was measured, not guessed. One run, counted byte by byte: 885,037,601.
+
+It is still wrong, and it is wrong in the way that matters most.
+
+The test fills the link for ten seconds. What it moves is therefore not a property of
+the test at all — it is rate multiplied by time. 885 MB was 674 Mbit/s over ten and a
+half seconds, and nothing more general than that. Ten runs on this one machine over one
+evening:
+
+```
+226 Mbit/s ->  285 MB          399 Mbit/s ->  503 MB
+254 Mbit/s ->  318 MB          521 Mbit/s ->  652 MB
+263 Mbit/s ->  335 MB          674 Mbit/s ->  885 MB
+312 Mbit/s ->  390 MB          688 Mbit/s ->  860 MB
+316 Mbit/s ->  395 MB          350 Mbit/s ->  437 MB
+```
+
+A factor of three, without leaving the room. Widen it to the connections people
+actually have and the constant becomes absurd: 12.5 MB on a 10 Mbit/s line, 1.25 GB on
+a gigabit one. A hundredfold.
+
+Now ask who the warning is for. It is there for the reader on a metered or a slow
+connection, deciding whether they can afford to press. That reader is on the slow line,
+which is exactly where the figure is most wrong — told 885 MB when the truth for them
+is 12.5. The one sentence written to protect somebody would have frightened off the
+only person it was addressed to, by a factor of seventy. And on a fast line it
+understates, which is the other direction and the dangerous one.
+
+Nothing failed here either. But unlike every case above, the number itself was not even
+wrong. It was correct, reproducible, and honestly obtained. What was wrong was the
+sentence it sat in, which quietly promoted a measurement of one machine into a property
+of the software.
+
+### What did not catch it
+
+Remeasuring. The instruction that led here was to remeasure the 885 MB, and remeasuring
+is what surfaced the problem — but on its own it would only have swapped one constant
+for another. The next run said 860 MB. The one after that, 395. The one after that,
+652. Three more figures, each as true and as useless as the first.
+
+What caught it was the question *of what is this a property?* — and the answer, once
+asked, was neither the test nor the application but the reader's own line.
+
+The screen now states the rule, 1.25 MB per Mbit/s in each direction, until it has
+something better; and once a complete test has run, it states what **that** test moved,
+with its date. The application has measured the reader's connection by then and has no
+business guessing at it.
+
+There is a second thing worth saying, because it is unusual. Every other defect in this
+document was in the code. This one was in the specification: the brief said to
+remeasure a constant, which took for granted that a correct constant existed. A
+requirement can carry the defect just as quietly as an implementation can, and it is
+harder to notice, because nobody thinks to audit the thing they are working from.
+
 ---
 
 ## The through-line
 
-Eight defects. Zero exceptions, zero warnings, zero failing tests at the moment each
-one was live. Seven returned a plausible number; one returned a correct one.
+Nine defects. Zero exceptions, zero warnings, zero failing tests at the moment each one
+was live. Seven returned a plausible number; one returned a correct number answering a
+different question; and one returned a correct number that described the machine it was
+measured on rather than anything it was printed next to.
 
 A green test suite proves the code does what the test says. A clean build proves the
 compiler had no objection. Neither proves the number on screen is true. The only thing
@@ -240,9 +311,11 @@ that did was an independent reference — and in the seventh case, not even that
 took noticing that two correct numbers were being compared as if they measured the
 same thing.
 
-The eighth is the one that should worry you most, because by then the audit was over,
-the tests were written, the README was committed, and the defect was found by glancing
-at a screenshot. There is no reason to think it is the last.
+The eighth is the one that should worry you most about the code, because by then the
+audit was over, the tests were written, the README was committed, and the defect was
+found by glancing at a screenshot. The ninth is the one that should worry you most about
+everything else: it was not in the code at all, and no amount of measuring the code
+would ever have reached it.
 
 ## Where this account is unreliable about itself
 
