@@ -363,6 +363,33 @@ builds, no API newer than macOS 13 is used without a guard — that half is genu
 enforced. Runtime behaviour on macOS 13 is a separate question, and it has not been
 tested.
 
+## The guard that would have disabled the guard
+
+The check above was added to watch two linker warnings. Watching them meant keeping the
+test output in a file, and keeping it meant a pipe:
+
+```
+xcodebuild test ... 2>&1 | tee test.log
+```
+
+A pipeline reports the exit status of its last command, and `tee` succeeds whatever it
+is handed. So that line returns zero when the tests fail. Measured both ways under
+bash, rather than reasoned about:
+
+```
+set -o pipefail     false | tee log   ->  exit 1, the script stops
+no pipefail         false | tee log   ->  exit 0, the failure is swallowed
+```
+
+The step being added to notice two warnings would have stopped the build noticing a
+hundred failing tests, and the workflow would have gone green while doing it. No
+exception, no error, nothing raised — the same shape as every defect above, this time in
+the instrument rather than in the thing it was measuring.
+
+`set -o pipefail` is one line and it goes before the pipe. The general form is worth
+more than the fix: an instrument added to a system becomes part of that system, and
+nothing is measuring the instrument.
+
 ## The original and the copy
 
 One rule came out of writing all this down, and it is not about measurement.
