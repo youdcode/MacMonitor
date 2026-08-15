@@ -146,82 +146,27 @@ stale number on display as though it were live.
 ## Throughput is not capacity
 
 The Network screen shows two numbers that can differ by four orders of magnitude and
-both be correct.
+both be correct. **Throughput** is what is passing right now; an idle connection reads a
+few kilobytes per second. **Capacity** is what the link carries when something
+deliberately fills it, which is what a speed test measures. They sit in separate cards
+and the app never computes one from the other, because this is the confusion I fell for
+myself — 16 kB/s on the screen, 742.7 Mbit/s in a browser at the same moment, and the
+obvious conclusion that the application was wrong by a factor of five thousand. Both
+numbers were right.
 
-**Throughput** is what is passing right now; an idle connection reads a few kilobytes
-per second. **Capacity** is what the link carries when something deliberately fills
-it, which is what a speed test measures. They live in separate cards, and the app
-never computes one from the other.
+The capacity test runs ndt7 against M-Lab, in both directions, only when you press the
+button. Before you press it the screen says that M-Lab collects the IP address your
+provider gave you along with the result, and publishes both
+([privacy policy](https://www.measurementlab.net/privacy/)). M-Lab's discussion list
+says the same test is what Google's Internet Speed Test
+integrates ([source](https://groups.google.com/a/measurementlab.net/g/discuss/c/iR4zO_rT4KE)).
 
-The capacity test runs ndt7 against M-Lab servers, in both directions, only when you
-press the button. On the M-Lab discussion list: *"Both speed.measurementlab.net and
-Google's Internet Speed Test integrate NDT."*
-([source](https://groups.google.com/a/measurementlab.net/g/discuss/c/iR4zO_rT4KE))
-
-### What it costs, and why the app will not name one number
-
-The test fills the link for ten seconds in each direction. That means what it moves is
-not a property of the test at all — it is whatever your connection can carry. Ten
-seconds at 1 Mbit/s is 1.25 MB, and it scales from there.
-
-So the screen does not name a figure of its own. Before the first run it states the
-rule; after one, it states what **your** last test moved, because by then the app has
-measured your connection and has no need to guess at it. The old text said "about
-885 MB", which was measured, honest, and a property of one machine on one evening — on
-a 10 Mbit/s line the same test costs 12.5 MB, and the warning would have frightened off
-the one reader it existed to protect.
-
-Every complete run measured while building this:
-
-| rate | moved | rule predicts |
-|---:|---:|---:|
-| 226 Mbit/s up | 285 MB | 283 MB |
-| 254 Mbit/s up | 318 MB | 318 MB |
-| 263 Mbit/s up | 335 MB | 329 MB |
-| 312 Mbit/s down | 390 MB | 390 MB |
-| 316 Mbit/s down | 395 MB | 395 MB |
-| 350 Mbit/s down | 437 MB | 438 MB |
-| 399 Mbit/s up | 503 MB | 499 MB |
-| 521 Mbit/s down | 652 MB | 652 MB |
-| 674 Mbit/s down | 885 MB | 843 MB |
-| 688 Mbit/s down | 860 MB | 860 MB |
-
-Every row lands within two per cent except the 674 Mbit/s one, which ran for ten and a
-half seconds rather than ten and moved five per cent more for it.
-
-The interface counters were read either side of one of those runs as an independent
-reference: they saw 708 MB in and 529 MB out where the app counted 652 and 503, which
-is 8.7 % and 5.2 % more. That is packet headers and the acknowledgements each direction
-sends back — and it is also the check that the upload payloads are not being compressed
-away, which is why they are random rather than zeroed.
-
-### One test or two, against M-Lab's forty a day
-
-M-Lab documents "a rate limit of 40 tests per client per day" and says a client that
-hits it is answered with an HTTP 204 No Content. A 204 is an HTTP status, and the only
-HTTP request in the whole flow is the one for the server list. That request returns
-`wss://` URLs for both directions carrying the same access token — compared character
-by character, identical — and that one token was observed opening a download connection
-followed by four separate upload connections, all accepted.
-
-So a complete test in both directions costs one of the forty. What is *not* established:
-M-Lab nowhere writes the sentence "a bidirectional test counts as one". The conclusion
-above is drawn from where the refusal is returned and from the token being reusable.
-
-### The dial
-
-The capacity reading sits on a logarithmic dial, base ten, three decades, 1 Mbit/s to
-1000. Linear would be unreadable: over the same 270 degrees of travel, 5 Mbit/s would
-sit 1.4 degrees from the stop and 20 Mbit/s 5.4 degrees, so every connection from
-unusable to decent would occupy the first tenth of the dial while the top half waited
-for speeds most people do not have. Logarithmically those two are 63 and 117 degrees,
-which is the difference between reading a dial and squinting at it.
-
-A link outside the scale pins the needle rather than running off the dial, and the exact
-figure is printed in the middle either way. The top tick is labelled `1000+` for that
-reason. The five-level rating underneath describes the **download**: its boundaries were
-chosen for one, and calling an ordinary 25 Mbit/s upstream "slow" is a judgement nothing
-here has earned.
+What a run costs, why the screen names your last figure rather than one of its own, and
+the ten runs behind the rule: case 9 of
+[docs/plausible-and-wrong.md](docs/plausible-and-wrong.md). Why one bidirectional test
+costs one of M-Lab's forty a day, and what part of that is inference:
+`SpeedTestFacts.dailyTestLimit` in `MacMonitor/SpeedTest.swift`. Why the dial is
+logarithmic, in degrees: `GaugeScale` in `MacMonitor/Metrics.swift`.
 
 ## The page size trap
 

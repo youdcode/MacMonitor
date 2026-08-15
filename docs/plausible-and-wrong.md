@@ -248,20 +248,38 @@ It is still wrong, and it is wrong in the way that matters most.
 
 The test fills the link for ten seconds. What it moves is therefore not a property of
 the test at all — it is rate multiplied by time. 885 MB was 674 Mbit/s over ten and a
-half seconds, and nothing more general than that. Ten runs on this one machine over one
-evening:
+half seconds, and nothing more general than that.
 
-```
-226 Mbit/s ->  285 MB          399 Mbit/s ->  503 MB
-254 Mbit/s ->  318 MB          521 Mbit/s ->  652 MB
-263 Mbit/s ->  335 MB          674 Mbit/s ->  885 MB
-312 Mbit/s ->  390 MB          688 Mbit/s ->  860 MB
-316 Mbit/s ->  395 MB          350 Mbit/s ->  437 MB
-```
+Ten seconds at 1 Mbit/s is 1.25 MB, and it scales. Ten runs on this one machine over
+one evening, each rate against what that rule predicts for it:
 
-A factor of three, without leaving the room. Widen it to the connections people
-actually have and the constant becomes absurd: 12.5 MB on a 10 Mbit/s line, 1.25 GB on
-a gigabit one. A hundredfold.
+| measured | moved | the rule predicts |
+|---:|---:|---:|
+| 226 Mbit/s up | 285 MB | 283 MB |
+| 254 Mbit/s up | 318 MB | 318 MB |
+| 263 Mbit/s up | 335 MB | 329 MB |
+| 312 Mbit/s down | 390 MB | 390 MB |
+| 316 Mbit/s down | 395 MB | 395 MB |
+| 350 Mbit/s down | 437 MB | 438 MB |
+| 399 Mbit/s up | 503 MB | 499 MB |
+| 521 Mbit/s down | 652 MB | 652 MB |
+| 674 Mbit/s down | 885 MB | 843 MB |
+| 688 Mbit/s down | 860 MB | 860 MB |
+
+Every row lands within two per cent except the 674 Mbit/s one, which ran for ten and a
+half seconds rather than ten and moved five per cent more for it. The rule holds. The
+constant never did.
+
+The counting was checked against something outside the application, as everything else
+in this document was. The interface counters, read either side of one of those runs,
+saw 708 MB in and 529 MB out where the application had counted 652 and 503 — 8.7 % and
+5.2 % more, which is packet headers and the acknowledgements each direction sends back.
+That gap is also what rules out the bytes being quietly compressed somewhere on the
+way, and it is why the upload payloads are random rather than zeroed.
+
+A factor of three in the middle column, without leaving the room. Widen it to the
+connections people actually have and the constant becomes absurd: 12.5 MB on a
+10 Mbit/s line, 1.25 GB on a gigabit one. A hundredfold.
 
 Now ask who the warning is for. It is there for the reader on a metered or a slow
 connection, deciding whether they can afford to press. That reader is on the slow line,
